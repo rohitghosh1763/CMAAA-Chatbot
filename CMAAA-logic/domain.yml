@@ -1,0 +1,100 @@
+version: "3.1"
+
+intents:
+    - greet
+    - goodbye
+    - affirm
+    - deny
+    - mood_great
+    - mood_unhappy
+    - bot_challenge
+    - nlu_fallback
+
+responses:
+    utter_greet:
+        - text: "Hey! How are you?"
+
+    utter_cheer_up:
+        - text: "Here is something to cheer you up:"
+          image: "https://i.imgur.com/nGF1K8f.jpg"
+
+    utter_did_that_help:
+        - text: "Did that help you?"
+
+    utter_happy:
+        - text: "Great, carry on!"
+
+    utter_goodbye:
+        - text: "Bye"
+
+    utter_iamabot:
+        - text: "I am a bot, powered by Rasa."
+
+    utter_default:
+        - text: "I'm sorry, I didn't understand that. Could you rephrase?"
+
+session_config:
+    session_expiration_time: 60
+    carry_over_slots_to_new_session: true
+# intents:
+#     - greet
+#     - goodbye
+#     - affirm
+#     - deny
+#     - mood_great
+#     - mood_unhappy
+#     - bot_challenge
+#     - nlu_fallback
+# responses:
+#     utter_greet:
+#         - text: "Hello! How can I assist you today?"
+#         - text: "Hey there! What can I do for you?"
+#         - text: "Hi! How may I help you?"
+
+#     utter_cheer_up:
+#         - text: "Don't worry, here's something to brighten your day! 😊"
+#           image: "https://imgur.com/AYlbbmX"
+#         - text: "Cheer up! Things will get better. Here’s something for you!"
+#           image: "https://imgur.com/AYlbbmX"
+
+#     utter_did_that_help:
+#         - text: "Did that help? Let me know if you need more assistance!"
+#         - text: "Was that helpful? I'm here if you need anything else."
+#         - text: "Did that answer your question?"
+
+#     utter_happy:
+#         - text: "That's awesome! Keep it up! 😊"
+#         - text: "Glad to hear that! Have a fantastic day!"
+#         - text: "Great! Let’s keep the positivity going!"
+
+#     utter_goodbye:
+#         - text: "Goodbye! Have a wonderful day! 😊"
+#         - text: "See you later! Take care!"
+#         - text: "Farewell! Hope to chat with you again soon!"
+
+#     utter_iamabot:
+#         - text: "I’m a bot, powered by Rasa. How can I assist you?"
+#         - text: "Yes, I'm a bot! But I'm here to help. What do you need?"
+#         - text: "I'm an AI assistant built with Rasa. Feel free to ask me anything!"
+
+#     utter_fallback:
+#         - text: "I'm sorry, I didn’t get that. Could you try rephrasing?"
+#         - text: "I didn't quite understand that. Can you say it differently?"
+#         - text: "Hmm... I’m not sure what you mean. Could you explain another way?"
+
+#     utter_mood_great:
+#         - text: "That’s wonderful to hear! Keep up the great vibes! 😊"
+#         - text: "Awesome! Stay happy and enjoy your day!"
+#         - text: "Glad to hear that! What made your day so great?"
+
+#     utter_default:
+#         - text: "I’m not sure I understood that. Can you rephrase?"
+#         - text: "Sorry, I didn’t quite get that. Could you clarify?"
+#         - text: "I couldn’t catch that. Can you try again in a different way?"
+
+# actions:
+#     - action_fetch_response
+
+# session_config:
+#     session_expiration_time: 60
+#     carry_over_slots_to_new_session: true

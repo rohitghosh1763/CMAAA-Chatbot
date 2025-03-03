@@ -1,0 +1,24 @@
+# config.yml
+language: en
+pipeline:
+- name: WhitespaceTokenizer
+- name: RegexFeaturizer
+- name: LexicalSyntacticFeaturizer
+- name: CountVectorsFeaturizer
+- name: components.mongodb_intent_classifier.MongoDBIntentClassifier
+  mongodb_uri: "mongodb://localhost:27017/"
+  db_name: "CMAAA"
+  collection_name: "intents"
+  confidence_threshold: 0.7
+- name: RegexEntityExtractor
+- name: EntitySynonymMapper
+- name: FallbackClassifier
+  threshold: 0.7
+
+policies:
+- name: MemoizationPolicy
+- name: RulePolicy
+- name: TEDPolicy
+  max_history: 5
+  epochs: 100
+assistant_id: 20250226-101411-speedy-facet

@@ -1,0 +1,57 @@
+version: "3.1"
+
+rules:
+    - rule: Greet the user anytime they say hello
+      steps:
+          - intent: greet
+          - action: utter_greet
+    - rule: Say goodbye anytime the user says goodbye
+      steps:
+          - intent: goodbye
+          - action: utter_goodbye
+
+    - rule: Say 'I am a bot' anytime the user challenges
+      steps:
+          - intent: bot_challenge
+          - action: utter_iamabot
+
+    - rule: Fallback rule
+      steps:
+          - intent: nlu_fallback
+          - action: utter_default
+# rules:
+#     - rule: Respond to any intent dynamically
+#       steps:
+#           - intent: greet
+#           - action: action_fetch_response
+
+#     - rule: Handle goodbye intent dynamically
+#       steps:
+#           - intent: goodbye
+#           - action: action_fetch_response
+
+#     - rule: Say 'I am a bot' anytime the user challenges
+#       steps:
+#           - intent: bot_challenge
+#           - action: utter_iamabot
+
+#     - rule: Respond to great mood
+#       steps:
+#           - intent: mood_great
+#           - action: utter_mood_great
+
+#     - rule: Respond to unhappy mood
+#       steps:
+#           - intent: mood_unhappy
+#           - action: utter_cheer_up
+#           - action: utter_did_that_help
+
+#     - rule: Fallback Rule
+#       steps:
+#           - intent: nlu_fallback
+#           - action: utter_fallback
+
+#     - rule: Handle out-of-scope queries
+#       steps:
+#           - intent: out_of_scope
+#           - action: utter_default

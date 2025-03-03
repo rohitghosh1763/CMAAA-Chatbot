@@ -1,0 +1,4 @@
+mongodb:
+    uri: "mongodb://localhost:27017/"
+    db_name: "CMAAA"
+    collection_name: "intents"

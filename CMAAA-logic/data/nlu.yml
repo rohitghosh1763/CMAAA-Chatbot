@@ -1,0 +1,191 @@
+version: "3.1"
+
+nlu:
+    - intent: greet
+      examples: |
+          - hey
+          - hello
+          - hi
+
+    - intent: goodbye
+      examples: |
+          - bye
+          - goodbye
+          - see you around
+
+    - intent: nlu_fallback
+      examples: |
+          - please help me
+          - I don't understand
+          - what do you mean
+
+# nlu:
+#     - intent: greet
+#       examples: |
+#           - hey
+#           - hello
+#           - hi
+#           - good morning
+#           - good evening
+#           - hey there
+#           - what's up?
+#           - yo!
+#           - greetings
+#           - howdy!
+#           - sup?
+#           - hi bot
+#           - hello there!
+
+#     - intent: goodbye
+#       examples: |
+#           - bye
+#           - goodbye
+#           - see you later
+#           - see ya!
+#           - take care
+#           - catch you later
+#           - have a great day!
+#           - I'm out
+#           - later!
+#           - bye bye
+
+#     - intent: affirm
+#       examples: |
+#           - yes
+#           - indeed
+#           - correct
+#           - that's right
+#           - absolutely
+#           - sure
+#           - yup
+#           - yeah
+#           - of course
+#           - you got it
+#           - definitely
+
+#     - intent: deny
+#       examples: |
+#           - no
+#           - not really
+#           - I don't think so
+#           - nope
+#           - nah
+#           - absolutely not
+#           - not at all
+#           - wrong
+#           - I disagree
+#           - I don't want to
+
+#     - intent: mood_great
+#       examples: |
+#           - great
+#           - amazing
+#           - wonderful
+#           - I am feeling very good
+#           - I'm happy
+#           - super excited!
+#           - fantastic
+#           - I'm doing awesome
+#           - I feel awesome
+#           - I love life!
+
+#     - intent: mood_unhappy
+#       examples: |
+#           - I am sad
+#           - I don't feel very well
+#           - very sad
+#           - unhappy
+#           - feeling down
+#           - I'm not in a good mood
+#           - I feel terrible
+#           - I'm upset
+#           - bad mood today
+#           - things aren't great
+
+#     - intent: bot_challenge
+#       examples: |
+#           - are you a bot?
+#           - am I talking to a bot?
+#           - are you real?
+#           - are you a human?
+#           - are you an AI?
+#           - who's behind this bot?
+#           - is this an automated system?
+#           - are you a chatbot?
+#           - are you self-aware?
+#           - do you have consciousness?
+
+#     - intent: out_of_scope
+#       examples: |
+#           - asdfghjkl
+#           - qwertyuiop
+#           - lkjhgfdsa
+#           - zxcasdqwe
+#           - rtyuiohjklm
+#           - 0987654321
+#           - 1qaz2wsx3edc
+#           - bvnmcxzpoiuy
+#           - *&^%$#@!
+#           - ???!!??!?
+#           - dshfiusdhfiuh
+#           - sfojsf9wejf0wjef
+#           - 348957389457
+#           - jhgfdsqwerty
+#           - g6t5rfedcvb
+#           - oiuytrewqasdf
+#           - 10x$@&*9z8
+#           - 34bq9q4gb9
+#           - xjdf98wqf0
+#           - qw8q9e8r98eqr
+#           - groiz4hgrzohrgoih
+#           - 09d8sd98s7d8sd7
+#           - 🤖🤯👀💥
+#           - 🔥🔥🔥🔥🔥🔥🔥🔥🔥🔥
+#           - 🎶🎵🎧🎤🎼
+#           - 𓂀𓂀𓂀𓂀𓂀
+#           - zh r rigr gro ighzrgh rh g zergoh
+#           - asdfgh jkl
+#           - qwerty   uiop
+#           - lkjhgf dsa
+#           - zx casd qwe
+#           - rtyuioh jklm
+#           - 098 765 4321
+#           - 1qaz 2wsx 3edc
+#           - bvn mcxz poiuy
+#           - * &^% $ #@!
+#           - ???!! ??!?
+#           - dshfiu sd hfiuh
+#           - sfoj sf9we jf0w jef
+#           - 34 895 738 9457
+#           - jhgf dsqwerty
+#           - g6t5r fed cvb
+#           - oiuy trew qas df
+#           - 10x $@& *9z8
+#           - 34bq 9q4g b9
+#           - xjd f98 wqf0
+#           - qw8 q9e8 r98 eqr
+#           - groi z4hg rzo hrgoih
+#           - 09d8s d98s 7d8s d7
+#           - nlvebgih 4g 8vih
+#           - sloaertulo94o9nutw9t 4t h49t;wp
+#           - /;p eg;oe 4jgoe jgo 4gpo
+#           - OLHI9bpuu4bp;9u [i reg 0  f w4foj;pw
+#           - 🤖 🤯 👀 💥
+#           - 🔥  🔥 🔥🔥🔥🔥🔥🔥🔥🔥🔥
+#           - 🎶 🎵 🎧 🎤 🎼
+#           - 𓂀 𓂀 𓂀 𓂀 𓂀
+#           -     (multiple spaces)
+#           - _____ (underscores)
+#           -     (tabs and spaces)
+#           - - - - - - (hyphens)
+#           - !@ #$ %^ &*()
+#           - 123 456 789 000
+#           - d h 9 w d f 8 2 d
+#           - a
+#           - b
+#           - k
+#           - f
+#           - q
+#           - j
+#           - 4i
+#           - 3d 3mf 45g
