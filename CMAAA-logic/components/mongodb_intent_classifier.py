@@ -1,4 +1,5 @@
 import logging
+import datetime
 from typing import Any, Dict, List, Text, Optional
 
 from rasa.engine.graph import GraphComponent, ExecutionContext
@@ -31,14 +32,16 @@ class MongoDBIntentClassifier(GraphComponent):
         """Initialize the MongoDB intent classifier."""
         self.config = config
         self.mongodb_uri = config.get("mongodb_uri", "mongodb://localhost:27017/")
-        self.db_name = config.get("db_name", "rasa_nlu")
+        self.db_name = config.get("db_name", "CMAAA")
         self.collection_name = config.get("collection_name", "intents")
+        self.unclassified_collection_name = config.get("unclassified_collection_name", "unclassified_queries")
         self.confidence_threshold = config.get("confidence_threshold", 0.7)
            
         try:
             self.client = MongoClient(self.mongodb_uri)
             self.db = self.client[self.db_name]
             self.collection = self.db[self.collection_name]
+            self.unclassified_collection = self.db[self.unclassified_collection_name]
             
             # Test the connection
             collection_exists = self.collection_name in self.db.list_collection_names()
@@ -58,12 +61,58 @@ class MongoDBIntentClassifier(GraphComponent):
             self.client = None
             self.db = None
             self.collection = None
+            self.unclassified_collection = None
 
     def process(self, messages: List[Message]) -> List[Message]:
         """Process a list of messages and classify their intents using MongoDB."""
         for message in messages:
             self._classify_intent(message)
         return messages
+
+    def _store_unclassified_query(self, text: str) -> None:
+        """Store unclassified query with only text and current date."""
+        if self.unclassified_collection is None:
+            logger.error("❌ MongoDB unclassified collection not available. Skipping storage.")
+            return
+        
+        try:
+            # Insert the query with the current date
+            self.unclassified_collection.insert_one({
+                "text": text,
+                "date": datetime.datetime.now()
+            })
+            logger.info(f"➕ Stored unclassified query: '{text}'")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to store unclassified query: {e}")
+
+        
+    
+    # def _store_unclassified_query(self, text: str) -> None:
+    #     """Store unclassified query in a separate collection."""
+    #     if self.unclassified_collection is None:
+    #         logger.error("❌ MongoDB unclassified collection not available. Skipping storage.")
+    #         return
+            
+    #     try:
+    #         # Store with timestamp and without duplicates
+    #         result = self.unclassified_collection.update_one(
+    #             {"text": text},
+    #             {
+    #                 "$set": {"text": text, "last_seen": datetime.datetime.now()},
+    #                 "$inc": {"count": 1},
+    #                 "$setOnInsert": {"first_seen": datetime.datetime.now()}
+    #             },
+    #             upsert=True
+    #         )
+            
+    #         if result.upserted_id:
+    #             logger.info(f"➕ Stored new unclassified query: '{text}'")
+    #         else:
+    #             logger.info(f"🔄 Updated existing unclassified query: '{text}'")
+                
+    #     except Exception as e:
+    #         logger.error(f"❌ Failed to store unclassified query: {e}")
 
     def _classify_intent(self, message: Message) -> None:
         """Query MongoDB to classify the intent of a message."""
@@ -116,6 +165,9 @@ class MongoDBIntentClassifier(GraphComponent):
             logger.debug("Available intents and examples:")
             for intent_doc in self.collection.find({}, {"intent_name": 1, "examples": 1, "_id": 0}):
                 logger.debug(f"Intent: {intent_doc.get('intent_name')}, Examples: {intent_doc.get('examples')}")
+            
+            # Store the unclassified query
+            self._store_unclassified_query(text)
                 
             fallback_intent = {"name": "nlu_fallback", "confidence": 0.3}
             message.set("intent", fallback_intent, add_to_output=True)
