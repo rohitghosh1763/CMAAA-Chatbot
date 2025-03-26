@@ -1,37 +1,35 @@
 version: "3.1"
 
 intents:
+    # - catch_all
     - greet
     - goodbye
-    - affirm
-    - deny
-    - mood_great
-    - mood_unhappy
-    - bot_challenge
-    - nlu_fallback
 
-responses:
-    utter_greet:
-        - text: "Hey! How are you?"
+responses: {}
 
-    utter_cheer_up:
-        - text: "Here is something to cheer you up:"
-          image: "https://i.imgur.com/nGF1K8f.jpg"
+actions:
+    - action_fetch_response
+    # utter_greet:
+    #     - text: "Hey! How are you?"
 
-    utter_did_that_help:
-        - text: "Did that help you?"
+    # utter_cheer_up:
+    #     - text: "Here is something to cheer you up:"
+    #       image: "https://i.imgur.com/nGF1K8f.jpg"
 
-    utter_happy:
-        - text: "Great, carry on!"
+    # utter_did_that_help:
+    #     - text: "Did that help you?"
 
-    utter_goodbye:
-        - text: "Bye"
+    # utter_happy:
+    #     - text: "Great, carry on!"
 
-    utter_iamabot:
-        - text: "I am a bot, powered by Rasa."
+    # utter_goodbye:
+    #     - text: "Bye"
 
-    utter_default:
-        - text: "I'm sorry, I didn't understand that. Could you rephrase?"
+    # utter_iamabot:
+    #     - text: "I am a bot, powered by Rasa."
+
+    # utter_default:
+    #     - text: "I'm sorry, I didn't understand that. Could you rephrase?"
 
 session_config:
     session_expiration_time: 60
@@ -91,9 +89,6 @@ session_config:
 #         - text: "I’m not sure I understood that. Can you rephrase?"
 #         - text: "Sorry, I didn’t quite get that. Could you clarify?"
 #         - text: "I couldn’t catch that. Can you try again in a different way?"
-
-# actions:
-#     - action_fetch_response
 
 # session_config:
 #     session_expiration_time: 60

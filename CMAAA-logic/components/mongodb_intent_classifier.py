@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
     [DefaultV1Recipe.ComponentType.INTENT_CLASSIFIER], is_trainable=False
 )
 class MongoDBIntentClassifier(GraphComponent):
-    """Custom intent classifier that queries MongoDB for intent prediction."""
+    """Custom intent classifier that queries MongoDB for intent prediction and rule-based responses."""
 
     @classmethod
     def create(
@@ -33,50 +33,106 @@ class MongoDBIntentClassifier(GraphComponent):
         self.config = config
         self.mongodb_uri = config.get("mongodb_uri", "mongodb://localhost:27017/")
         self.db_name = config.get("db_name", "CMAAA")
-        self.collection_name = config.get("collection_name", "intents")
+        self.intent_collection_name = config.get("intent_collection_name", "intents")
+        self.rules_collection_name = config.get("rules_collection_name", "rules")
         self.unclassified_collection_name = config.get("unclassified_collection_name", "unclassified_queries")
         self.confidence_threshold = config.get("confidence_threshold", 0.7)
-           
+        
         try:
             self.client = MongoClient(self.mongodb_uri)
             self.db = self.client[self.db_name]
-            self.collection = self.db[self.collection_name]
+            self.intent_collection = self.db[self.intent_collection_name]
+            self.rules_collection = self.db[self.rules_collection_name]
             self.unclassified_collection = self.db[self.unclassified_collection_name]
-            
-            # Test the connection
-            collection_exists = self.collection_name in self.db.list_collection_names()
-            if collection_exists:
-                count = self.collection.count_documents({})
-                logger.info(f"✅ Successfully connected to MongoDB. Found {count} intents in the collection.")
+
+            # ? Connection Testing
+            if self.intent_collection_name in self.db.list_collection_names():
+                count = self.intent_collection.count_documents({})
+                logger.info(f"✅ Connected to MongoDB. Found {count} intents in '{self.intent_collection_name}'.")
             else:
-                logger.error(f"❌ Collection '{self.collection_name}' not found in database '{self.db_name}'")
-                
-            # Print a sample intent for verification
-            sample = self.collection.find_one({})
-            if sample:
-                logger.info(f"Sample intent: {sample.get('intent_name')} with {len(sample.get('examples', []))} examples")
+                logger.error(f"❌ Collection '{self.intent_collection_name}' not found in database '{self.db_name}'")
+
+            if self.rules_collection_name in self.db.list_collection_names():
+                count = self.rules_collection.count_documents({})
+                logger.info(f"✅ Found {count} rules in '{self.rules_collection_name}'.")
+            else:
+                logger.warning(f"⚠️ No rules found in '{self.rules_collection_name}'.")
+
         except Exception as e:
             logger.error(f"❌ Failed to connect to MongoDB: {e}")
-            # Create dummy collection to avoid errors
             self.client = None
             self.db = None
-            self.collection = None
+            self.intent_collection = None
+            self.rules_collection = None
             self.unclassified_collection = None
 
     def process(self, messages: List[Message]) -> List[Message]:
-        """Process a list of messages and classify their intents using MongoDB."""
+        """Process messages by classifying intents and retrieving rule-based responses."""
         for message in messages:
-            self._classify_intent(message)
+            self._classify_intent_and_fetch_rule(message)
         return messages
 
+    def _classify_intent_and_fetch_rule(self, message: Message) -> None:
+        """Classify the intent and retrieve the response rule from MongoDB."""
+        text = message.get("text")
+
+        if not text:
+            return
+        
+        if self.intent_collection is None:
+            logger.error("❌ MongoDB intent collection not available. Skipping intent classification.")
+            fallback_intent = {"name": "nlu_fallback", "confidence": 0.3}
+            message.set("intent", fallback_intent, add_to_output=True)
+            return
+        
+        logger.info(f"🔍 Classifying text: '{text}'")
+        
+        # Try exact, case-insensitive, and partial matches
+        intent_result = self.intent_collection.find_one(
+            {"examples": {"$regex": f"^{text}$", "$options": "i"}},
+            {"intent_name": 1, "_id": 0}
+        )
+
+        if intent_result:
+            intent_name = intent_result.get("intent_name")
+            intent = {"name": intent_name, "confidence": 0.98}
+            message.set("intent", intent, add_to_output=True)
+            logger.info(f"✅ Classified '{text}' as '{intent_name}'")
+            
+            # ? Lookup rules for this intent
+            response = self._fetch_rule_response(intent_name)
+            if response:
+                message.set("response", response, add_to_output=True)
+                logger.info(f"💬 Response for '{intent_name}': {response}")
+            else:
+                logger.warning(f"⚠️ No rule response found for intent '{intent_name}'.")
+            
+        else:
+            logger.info(f"❌ No intent match found in MongoDB for '{text}'")
+            self._store_unclassified_query(text)
+
+            fallback_intent = {"name": "nlu_fallback", "confidence": 0.3}
+            message.set("intent", fallback_intent, add_to_output=True)
+
+    def _fetch_rule_response(self, intent_name: str) -> Optional[str]:
+        """Retrieve a response from the rules collection based on the intent."""
+        if self.rules_collection is None:
+            logger.error("❌ MongoDB rules collection not available. Skipping rule lookup.")
+            return None
+
+        rule = self.rules_collection.find_one(
+            {"intent": intent_name},
+            {"response": 1, "_id": 0}
+        )
+        return rule.get("response") if rule else None
+
     def _store_unclassified_query(self, text: str) -> None:
-        """Store unclassified query with only text and current date."""
+        """Store unclassified queries for later review."""
         if self.unclassified_collection is None:
             logger.error("❌ MongoDB unclassified collection not available. Skipping storage.")
             return
         
         try:
-            # Insert the query with the current date
             self.unclassified_collection.insert_one({
                 "text": text,
                 "date": datetime.datetime.now()
@@ -86,92 +142,6 @@ class MongoDBIntentClassifier(GraphComponent):
         except Exception as e:
             logger.error(f"❌ Failed to store unclassified query: {e}")
 
-        
-    
-    # def _store_unclassified_query(self, text: str) -> None:
-    #     """Store unclassified query in a separate collection."""
-    #     if self.unclassified_collection is None:
-    #         logger.error("❌ MongoDB unclassified collection not available. Skipping storage.")
-    #         return
-            
-    #     try:
-    #         # Store with timestamp and without duplicates
-    #         result = self.unclassified_collection.update_one(
-    #             {"text": text},
-    #             {
-    #                 "$set": {"text": text, "last_seen": datetime.datetime.now()},
-    #                 "$inc": {"count": 1},
-    #                 "$setOnInsert": {"first_seen": datetime.datetime.now()}
-    #             },
-    #             upsert=True
-    #         )
-            
-    #         if result.upserted_id:
-    #             logger.info(f"➕ Stored new unclassified query: '{text}'")
-    #         else:
-    #             logger.info(f"🔄 Updated existing unclassified query: '{text}'")
-                
-    #     except Exception as e:
-    #         logger.error(f"❌ Failed to store unclassified query: {e}")
-
-    def _classify_intent(self, message: Message) -> None:
-        """Query MongoDB to classify the intent of a message."""
-        text = message.get("text")
-        
-        if not text:
-            return
-            
-        if self.collection is None:
-            logger.error("❌ MongoDB collection not available. Skipping intent classification.")
-            fallback_intent = {"name": "nlu_fallback", "confidence": 0.3}
-            message.set("intent", fallback_intent, add_to_output=True)
-            return
-        
-        logger.info(f"🔍 Trying to classify text: '{text}'")
-        
-        # Try direct match first
-        logger.debug(f"Attempting exact match for '{text}'")
-        result = self.collection.find_one(
-            {"examples": text},
-            {"intent_name": 1, "_id": 0}
-        )
-        
-        # If no exact match, try case-insensitive match
-        if not result:
-            logger.debug(f"No exact match, trying case-insensitive match for '{text}'")
-            result = self.collection.find_one(
-                {"examples": {"$regex": f"^{text}$", "$options": "i"}},
-                {"intent_name": 1, "_id": 0}
-            )
-            
-        # If still no match, try partial match (contains)
-        if not result:
-            logger.debug(f"No exact or case-insensitive match, trying partial match for '{text}'")
-            result = self.collection.find_one(
-                {"examples": {"$regex": text, "$options": "i"}},
-                {"intent_name": 1, "_id": 0}
-            )
-            
-        # You can add more sophisticated matching here
-        
-        if result:
-            intent_name = result.get("intent_name")
-            intent = {"name": intent_name, "confidence": 0.98}
-            message.set("intent", intent, add_to_output=True)
-            logger.info(f"✅ MongoDB classified '{text}' as '{intent_name}'")
-        else:
-            # For debugging, list all intents and examples
-            logger.info(f"❌ No intent match found in MongoDB for '{text}'")
-            logger.debug("Available intents and examples:")
-            for intent_doc in self.collection.find({}, {"intent_name": 1, "examples": 1, "_id": 0}):
-                logger.debug(f"Intent: {intent_doc.get('intent_name')}, Examples: {intent_doc.get('examples')}")
-            
-            # Store the unclassified query
-            self._store_unclassified_query(text)
-                
-            fallback_intent = {"name": "nlu_fallback", "confidence": 0.3}
-            message.set("intent", fallback_intent, add_to_output=True)
-
     @classmethod
     def required_components(cls) -> List[Text]:
         """Components that should be included in the pipeline before this component."""
@@ -180,3 +150,6 @@ class MongoDBIntentClassifier(GraphComponent):
     def persist(self) -> None:
         """Nothing to persist as the data is stored in MongoDB."""
         pass
+
+
+
