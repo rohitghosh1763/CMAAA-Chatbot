@@ -1,26 +1,69 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { AlertTriangle, Trash2, Edit } from "lucide-react";
+import {
+    AlertTriangle,
+    Trash2,
+    Edit,
+    ChevronRight,
+    Plus,
+    X,
+} from "lucide-react";
+import { toast } from "sonner";
+
+// Shadcn components
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const Admin = () => {
     const navigate = useNavigate();
     const [intents, setIntents] = useState([]);
     const [unclassifiedQueries, setUnclassifiedQueries] = useState([]);
+    const [rules, setRules] = useState([]);
+
+    // Intent management
     const [currentIntent, setCurrentIntent] = useState({
         intent_name: "",
         examples: [],
     });
-    const [rules, setRules] = useState([]); // State for rules
+    const [example, setExample] = useState("");
+    const [editMode, setEditMode] = useState(false);
+
+    // Rule management
     const [currentRule, setCurrentRule] = useState({
         intent: "",
         response: "",
-    }); // State for current rule (for editing/creating)
-    const [editRuleMode, setEditRuleMode] = useState(false); // State to track if editing a rule
-    const [example, setExample] = useState("");
-    const [editMode, setEditMode] = useState(false);
+    });
+    const [editRuleMode, setEditRuleMode] = useState(false);
+
+    // Common states
     const [loading, setLoading] = useState(false);
     const [selectedQuery, setSelectedQuery] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState({ type: "", id: "" });
 
     // Fetch data on component mount
     useEffect(() => {
@@ -30,13 +73,13 @@ const Admin = () => {
                 const [intentsRes, queriesRes, rulesRes] = await Promise.all([
                     axios.get("http://localhost:5000/intents"),
                     axios.get("http://localhost:5000/unclassified-queries"),
-                    axios.get("http://localhost:5000/rules"), // Fetch rules
+                    axios.get("http://localhost:5000/rules"),
                 ]);
                 setIntents(intentsRes.data);
                 setUnclassifiedQueries(queriesRes.data);
-                setRules(rulesRes.data); // Set rules
+                setRules(rulesRes.data);
             } catch (error) {
-                console.error("Error fetching data:", error);
+                toast.error("Error fetching data");
             } finally {
                 setLoading(false);
             }
@@ -44,61 +87,13 @@ const Admin = () => {
         fetchData();
     }, []);
 
-    // Handle rule form submission (create/update)
-    const handleRuleSubmit = async (e) => {
-        e.preventDefault();
-        if (!currentRule.intent.trim() || !currentRule.response.trim()) return;
-
-        setLoading(true);
-        try {
-            const url = editRuleMode
-                ? `http://localhost:5000/rules/${currentRule._id}`
-                : "http://localhost:5000/rules";
-            const method = editRuleMode ? "put" : "post";
-            await axios[method](url, currentRule);
-
-            const { data } = await axios.get("http://localhost:5000/rules");
-            setRules(data);
-            resetRuleForm();
-        } catch (error) {
-            console.error("Error saving rule:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Reset rule form
-    const resetRuleForm = () => {
-        setCurrentRule({ intent: "", response: "" });
-        setEditRuleMode(false);
-    };
-
-    // Handle deleting a rule
-    const handleDeleteRule = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this rule?"))
-            return;
-
-        setLoading(true);
-        try {
-            await axios.delete(`http://localhost:5000/rules/${id}`);
-            setRules(rules.filter((rule) => rule._id !== id));
-        } catch (error) {
-            console.error("Error deleting rule:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Handle editing a rule
-    const handleEditRule = (rule) => {
-        setCurrentRule(rule);
-        setEditRuleMode(true);
-    };
-
-    // Handle intent form submission
+    // Intent management functions
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!currentIntent.intent_name.trim()) return;
+        if (!currentIntent.intent_name.trim()) {
+            toast.error("Intent name is required");
+            return;
+        }
 
         setLoading(true);
         try {
@@ -111,38 +106,40 @@ const Admin = () => {
             const { data } = await axios.get("http://localhost:5000/intents");
             setIntents(data);
             resetForm();
+            toast.success(
+                `Intent ${editMode ? "updated" : "created"} successfully`
+            );
         } catch (error) {
-            console.error("Error saving intent:", error);
+            toast.error("Error saving intent");
         } finally {
             setLoading(false);
         }
     };
 
-    // Reset intent form
     const resetForm = () => {
         setCurrentIntent({ intent_name: "", examples: [] });
         setEditMode(false);
     };
 
-    // Handle deleting an intent
     const handleDeleteIntent = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this intent?"))
-            return;
-
         setLoading(true);
         try {
             await axios.delete(`http://localhost:5000/intents/${id}`);
             setIntents(intents.filter((intent) => intent._id !== id));
+            toast.success("Intent deleted successfully");
         } catch (error) {
-            console.error("Error deleting intent:", error);
+            toast.error("Error deleting intent");
         } finally {
             setLoading(false);
+            setDeleteDialogOpen(false);
         }
     };
 
-    // Handle adding an example to the current intent
     const handleAddExample = () => {
-        if (!example.trim()) return;
+        if (!example.trim()) {
+            toast.error("Example cannot be empty");
+            return;
+        }
         setCurrentIntent({
             ...currentIntent,
             examples: [...currentIntent.examples, example],
@@ -150,9 +147,65 @@ const Admin = () => {
         setExample("");
     };
 
-    // Handle adding a query to an intent
+    // Rule management functions
+    const handleRuleSubmit = async (e) => {
+        e.preventDefault();
+        if (!currentRule.intent.trim() || !currentRule.response.trim()) {
+            toast.error("Intent and response are required");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const url = editRuleMode
+                ? `http://localhost:5000/rules/${currentRule._id}`
+                : "http://localhost:5000/rules";
+            const method = editRuleMode ? "put" : "post";
+            await axios[method](url, currentRule);
+
+            const { data } = await axios.get("http://localhost:5000/rules");
+            setRules(data);
+            resetRuleForm();
+            toast.success(
+                `Rule ${editRuleMode ? "updated" : "created"} successfully`
+            );
+        } catch (error) {
+            toast.error("Error saving rule");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const resetRuleForm = () => {
+        setCurrentRule({ intent: "", response: "" });
+        setEditRuleMode(false);
+    };
+
+    const handleDeleteRule = async (id) => {
+        setLoading(true);
+        try {
+            await axios.delete(`http://localhost:5000/rules/${id}`);
+            setRules(rules.filter((rule) => rule._id !== id));
+            toast.success("Rule deleted successfully");
+        } catch (error) {
+            toast.error("Error deleting rule");
+        } finally {
+            setLoading(false);
+            setDeleteDialogOpen(false);
+        }
+    };
+
+    const handleEditRule = (rule) => {
+        setCurrentRule(rule);
+        setEditRuleMode(true);
+    };
+
+    // Query management functions
     const handleAddQueryToIntent = async () => {
-        if (!selectedQuery || !currentIntent.intent_name) return;
+        if (!selectedQuery || !currentIntent.intent_name) {
+            toast.error("Please select both a query and an intent");
+            return;
+        }
 
         try {
             await axios.post(
@@ -164,7 +217,6 @@ const Admin = () => {
                 }
             );
 
-            // Update state after successful operation
             setUnclassifiedQueries(
                 unclassifiedQueries.filter((q) => q._id !== selectedQuery._id)
             );
@@ -172,12 +224,12 @@ const Admin = () => {
             setIntents(data);
             setSelectedQuery(null);
             resetForm();
+            toast.success("Query added to intent successfully");
         } catch (error) {
-            console.error("Error adding query to intent:", error);
+            toast.error("Error adding query to intent");
         }
     };
 
-    // Handle deleting an unclassified query
     const handleDeleteQuery = async (queryId) => {
         setLoading(true);
         try {
@@ -190,837 +242,558 @@ const Admin = () => {
             if (selectedQuery && selectedQuery._id === queryId) {
                 setSelectedQuery(null);
             }
+            toast.success("Query deleted successfully");
         } catch (error) {
-            console.error("Error deleting query:", error);
+            toast.error("Error deleting query");
         } finally {
             setLoading(false);
+            setDeleteDialogOpen(false);
+        }
+    };
+
+    // Common functions
+    const confirmDelete = (type, id) => {
+        setItemToDelete({ type, id });
+        setDeleteDialogOpen(true);
+    };
+
+    const executeDelete = () => {
+        switch (itemToDelete.type) {
+            case "intent":
+                handleDeleteIntent(itemToDelete.id);
+                break;
+            case "rule":
+                handleDeleteRule(itemToDelete.id);
+                break;
+            case "query":
+                handleDeleteQuery(itemToDelete.id);
+                break;
+            default:
+                break;
         }
     };
 
     return (
-        <div className="flex flex-col min-h-screen bg-[#fefae0] p-4">
-            <div className="container mx-auto max-w-6xl">
-                <nav className="flex justify-between mb-6">
-                    <h1 className="text-3xl font-bold">Intent Management</h1>
-                    <button
-                        onClick={() => navigate("/")}
-                        className="bg-[#606c38] text-white px-4 py-2 rounded hover:bg-[#283618]"
-                    >
+        <div className="min-h-screen bg-gray-50 p-4">
+            <div className="container mx-auto max-w-6xl space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                        Admin Dashboard
+                    </h1>
+                    <Button onClick={() => navigate("/")} variant="outline">
+                        <ChevronRight className="mr-2 h-4 w-4" />
                         Back to Chat
-                    </button>
-                </nav>
-
-                {/* Rules Section */}
-                <div className="bg-[#f5ebe0] p-6 rounded-lg shadow mb-6">
-                    <h2 className="text-xl font-semibold mb-4">
-                        {editRuleMode ? "Edit Rule" : "Add New Rule"}
-                    </h2>
-                    <form onSubmit={handleRuleSubmit}>
-                        <div className="mb-4">
-                            <label className="block mb-2">Intent</label>
-                            <input
-                                type="text"
-                                value={currentRule.intent}
-                                onChange={(e) =>
-                                    setCurrentRule({
-                                        ...currentRule,
-                                        intent: e.target.value,
-                                    })
-                                }
-                                className="w-full p-2 border rounded"
-                                placeholder="e.g., greet, goodbye"
-                                required
-                            />
-                        </div>
-                        <div className="mb-4">
-                            <label className="block mb-2">Response</label>
-                            <input
-                                type="text"
-                                value={currentRule.response}
-                                onChange={(e) =>
-                                    setCurrentRule({
-                                        ...currentRule,
-                                        response: e.target.value,
-                                    })
-                                }
-                                className="w-full p-2 border rounded"
-                                placeholder="e.g., Hello, Goodbye"
-                                required
-                            />
-                        </div>
-                        <div className="flex justify-between">
-                            <button
-                                type="submit"
-                                className="bg-[#606c38] text-white px-4 py-2 rounded hover:bg-[#283618]"
-                                disabled={loading}
-                            >
-                                {loading
-                                    ? "Saving..."
-                                    : editRuleMode
-                                    ? "Update Rule"
-                                    : "Create Rule"}
-                            </button>
-                            {editRuleMode && (
-                                <button
-                                    type="button"
-                                    onClick={resetRuleForm}
-                                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-                                >
-                                    Cancel
-                                </button>
-                            )}
-                        </div>
-                    </form>
+                    </Button>
                 </div>
 
-                {/* Existing Rules */}
-                <div className="bg-[#f5ebe0] p-6 rounded-lg shadow mb-6">
-                    <h2 className="text-xl font-semibold mb-4">
-                        Existing Rules
-                    </h2>
-                    {loading && <p>Loading...</p>}
+                {/* Main Content Tabs */}
+                <Tabs defaultValue="intents" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="intents">Intents</TabsTrigger>
+                        <TabsTrigger value="rules">Rules</TabsTrigger>
+                        <TabsTrigger value="queries">
+                            Unclassified Queries
+                        </TabsTrigger>
+                    </TabsList>
 
-                    {rules.length === 0 && !loading ? (
-                        <p className="text-gray-500">
-                            No rules found. Create your first one!
-                        </p>
-                    ) : (
-                        <div className="overflow-y-auto max-h-96">
-                            {rules.map((rule) => (
-                                <div
-                                    key={rule._id}
-                                    className="mb-3 p-3 bg-white rounded shadow-sm"
+                    {/* Intents Tab */}
+                    <TabsContent value="intents" className="space-y-4">
+                        {/* Intent Form */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>
+                                    {editMode
+                                        ? "Edit Intent"
+                                        : "Create New Intent"}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <form
+                                    onSubmit={handleSubmit}
+                                    className="space-y-4"
                                 >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-bold">
-                                            {rule.intent}
-                                        </h3>
-                                        <div>
-                                            <button
-                                                onClick={() =>
-                                                    handleEditRule(rule)
-                                                }
-                                                className="text-blue-600 hover:text-blue-800 mr-2"
-                                            >
-                                                <Edit size={16} />
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handleDeleteRule(rule._id)
-                                                }
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="intent-name">
+                                            Intent Name
+                                        </Label>
+                                        <Input
+                                            id="intent-name"
+                                            value={currentIntent.intent_name}
+                                            onChange={(e) =>
+                                                setCurrentIntent({
+                                                    ...currentIntent,
+                                                    intent_name: e.target.value,
+                                                })
+                                            }
+                                            placeholder="e.g., greet, goodbye, thank_you"
+                                        />
                                     </div>
-                                    <p className="text-sm text-gray-600">
-                                        Response: {rule.response}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
 
-                {/* Intent Form */}
-                <div className="bg-[#f5ebe0] p-6 rounded-lg shadow mb-6">
-                    <h2 className="text-xl font-semibold mb-4">
-                        {editMode ? "Edit Intent" : "Add New Intent"}
-                    </h2>
-                    <form onSubmit={handleSubmit}>
-                        <div className="mb-4">
-                            <label className="block mb-2">Intent Name</label>
-                            <input
-                                type="text"
-                                value={currentIntent.intent_name}
-                                onChange={(e) =>
-                                    setCurrentIntent({
-                                        ...currentIntent,
-                                        intent_name: e.target.value,
-                                    })
-                                }
-                                className="w-full p-2 border rounded"
-                                placeholder="e.g., greet, goodbye, thank_you"
-                                required
-                            />
-                        </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="example">
+                                            Examples
+                                        </Label>
+                                        <div className="flex space-x-2">
+                                            <Input
+                                                id="example"
+                                                value={example}
+                                                onChange={(e) =>
+                                                    setExample(e.target.value)
+                                                }
+                                                placeholder="Add an example phrase"
+                                            />
+                                            <Button
+                                                type="button"
+                                                onClick={handleAddExample}
+                                            >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                Add
+                                            </Button>
+                                        </div>
 
-                        <div className="mb-4">
-                            <label className="block mb-2">Examples</label>
-                            <div className="flex mb-2">
-                                <input
-                                    type="text"
-                                    value={example}
-                                    onChange={(e) => setExample(e.target.value)}
-                                    className="flex-1 p-2 border rounded-l"
-                                    placeholder="Add an example phrase"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddExample}
-                                    className="bg-[#dda15e] px-4 py-2 rounded-r"
-                                >
-                                    Add
-                                </button>
-                            </div>
+                                        {currentIntent.examples.length > 0 && (
+                                            <div className="border rounded-lg p-3">
+                                                <ul className="space-y-1">
+                                                    {currentIntent.examples.map(
+                                                        (ex, index) => (
+                                                            <li
+                                                                key={index}
+                                                                className="flex justify-between items-center"
+                                                            >
+                                                                <span>
+                                                                    {ex}
+                                                                </span>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => {
+                                                                        const newExamples =
+                                                                            [
+                                                                                ...currentIntent.examples,
+                                                                            ];
+                                                                        newExamples.splice(
+                                                                            index,
+                                                                            1
+                                                                        );
+                                                                        setCurrentIntent(
+                                                                            {
+                                                                                ...currentIntent,
+                                                                                examples:
+                                                                                    newExamples,
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <X className="h-4 w-4 text-red-500" />
+                                                                </Button>
+                                                            </li>
+                                                        )
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
 
-                            <div className="bg-white p-3 rounded max-h-40 overflow-y-auto">
-                                {currentIntent.examples.length === 0 ? (
+                                    <div className="flex justify-end space-x-2">
+                                        {editMode && (
+                                            <Button
+                                                type="button"
+                                                onClick={resetForm}
+                                                variant="outline"
+                                            >
+                                                Cancel
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="submit"
+                                            disabled={loading}
+                                        >
+                                            {loading
+                                                ? "Saving..."
+                                                : editMode
+                                                ? "Update Intent"
+                                                : "Create Intent"}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        {/* Existing Intents */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Existing Intents</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {loading && (
+                                    <p className="text-gray-500">Loading...</p>
+                                )}
+
+                                {intents.length === 0 && !loading ? (
                                     <p className="text-gray-500">
-                                        No examples added yet
+                                        No intents found. Create your first one!
                                     </p>
                                 ) : (
-                                    <ul className="list-disc pl-5">
-                                        {currentIntent.examples.map(
-                                            (ex, index) => (
-                                                <li
-                                                    key={index}
-                                                    className="flex justify-between items-center mb-1"
+                                    <ScrollArea className="h-[400px] rounded-md border">
+                                        <div className="space-y-2 p-2">
+                                            {intents.map((intent) => (
+                                                <div
+                                                    key={intent._id}
+                                                    className="p-4 border rounded-lg"
                                                 >
-                                                    <span>{ex}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const newExamples =
-                                                                [
-                                                                    ...currentIntent.examples,
-                                                                ];
-                                                            newExamples.splice(
-                                                                index,
-                                                                1
-                                                            );
-                                                            setCurrentIntent({
-                                                                ...currentIntent,
-                                                                examples:
-                                                                    newExamples,
-                                                            });
-                                                        }}
-                                                        className="text-red-500 hover:text-red-700"
-                                                    >
-                                                        ×
-                                                    </button>
-                                                </li>
-                                            )
-                                        )}
-                                    </ul>
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <h3 className="font-medium">
+                                                                {
+                                                                    intent.intent_name
+                                                                }
+                                                            </h3>
+                                                            <div className="flex items-center space-x-2 mt-1">
+                                                                <Badge variant="outline">
+                                                                    {
+                                                                        intent
+                                                                            .examples
+                                                                            .length
+                                                                    }{" "}
+                                                                    example
+                                                                    {intent
+                                                                        .examples
+                                                                        .length !==
+                                                                    1
+                                                                        ? "s"
+                                                                        : ""}
+                                                                </Badge>
+                                                                {intent.examples
+                                                                    .length >
+                                                                    0 && (
+                                                                    <p className="text-sm text-gray-600 truncate">
+                                                                        "
+                                                                        {
+                                                                            intent
+                                                                                .examples[0]
+                                                                        }
+                                                                        "
+                                                                        {intent
+                                                                            .examples
+                                                                            .length >
+                                                                            1 &&
+                                                                            " and more..."}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex space-x-2">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    setCurrentIntent(
+                                                                        intent
+                                                                    );
+                                                                    setEditMode(
+                                                                        true
+                                                                    );
+                                                                }}
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    confirmDelete(
+                                                                        "intent",
+                                                                        intent._id
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
                                 )}
-                            </div>
-                        </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                        <div className="flex justify-between">
-                            <button
-                                type="submit"
-                                className="bg-[#606c38] text-white px-4 py-2 rounded hover:bg-[#283618]"
-                                disabled={loading}
-                            >
-                                {loading
-                                    ? "Saving..."
-                                    : editMode
-                                    ? "Update Intent"
-                                    : "Create Intent"}
-                            </button>
-                            {editMode && (
-                                <button
-                                    type="button"
-                                    onClick={resetForm}
-                                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
+                    {/* Rules Tab */}
+                    <TabsContent value="rules" className="space-y-4">
+                        {/* Rule Form */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>
+                                    {editRuleMode
+                                        ? "Edit Rule"
+                                        : "Create New Rule"}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <form
+                                    onSubmit={handleRuleSubmit}
+                                    className="space-y-4"
                                 >
-                                    Cancel
-                                </button>
-                            )}
-                        </div>
-                    </form>
-                </div>
-
-                {/* Existing Intents */}
-                <div className="bg-[#f5ebe0] p-6 rounded-lg shadow mb-6">
-                    <h2 className="text-xl font-semibold mb-4">
-                        Existing Intents
-                    </h2>
-                    {loading && <p>Loading...</p>}
-
-                    {intents.length === 0 && !loading ? (
-                        <p className="text-gray-500">
-                            No intents found. Create your first one!
-                        </p>
-                    ) : (
-                        <div className="overflow-y-auto max-h-96">
-                            {intents.map((intent) => (
-                                <div
-                                    key={intent._id}
-                                    className="mb-3 p-3 bg-white rounded shadow-sm"
-                                >
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="font-bold">
-                                            {intent.intent_name}
-                                        </h3>
-                                        <div>
-                                            <button
-                                                onClick={() =>
-                                                    setCurrentIntent(intent) ||
-                                                    setEditMode(true)
-                                                }
-                                                className="text-blue-600 hover:text-blue-800 mr-2"
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() =>
-                                                    handleDeleteIntent(
-                                                        intent._id
-                                                    )
-                                                }
-                                                className="text-red-600 hover:text-red-800"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <p className="text-sm text-gray-600 mb-1">
-                                        {intent.examples.length} example
-                                        {intent.examples.length !== 1
-                                            ? "s"
-                                            : ""}
-                                    </p>
-                                    {intent.examples.length > 0 && (
-                                        <div className="text-sm text-gray-700 italic">
-                                            "{intent.examples[0]}"
-                                            {intent.examples.length > 1 &&
-                                                " and more..."}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Unclassified Queries */}
-                <div className="bg-[#f5ebe0] p-6 rounded-lg shadow mb-6">
-                    <h2 className="text-xl font-semibold mb-4 flex items-center">
-                        <AlertTriangle className="mr-2 text-yellow-500" />
-                        Unclassified Queries
-                    </h2>
-
-                    {unclassifiedQueries.length === 0 ? (
-                        <p className="text-gray-600">
-                            No unclassified queries found.
-                        </p>
-                    ) : (
-                        <div className="space-y-3">
-                            {unclassifiedQueries.map((query) => (
-                                <div
-                                    key={query._id}
-                                    className={`p-3 rounded-md ${
-                                        selectedQuery?._id === query._id
-                                            ? "bg-blue-100 border-2 border-blue-300"
-                                            : "bg-gray-100"
-                                    } cursor-pointer hover:bg-gray-200 transition-colors`}
-                                >
-                                    <div className="flex justify-between items-start">
-                                        <div
-                                            className="flex-1"
-                                            onClick={() =>
-                                                setSelectedQuery(query)
+                                    <div className="space-y-2">
+                                        <Label htmlFor="intent">Intent</Label>
+                                        <Input
+                                            id="intent"
+                                            value={currentRule.intent}
+                                            onChange={(e) =>
+                                                setCurrentRule({
+                                                    ...currentRule,
+                                                    intent: e.target.value,
+                                                })
                                             }
-                                        >
-                                            <p className="text-gray-800 truncate">
-                                                {query.text}
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                {new Date(
-                                                    query.date
-                                                ).toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteQuery(query._id);
-                                            }}
-                                            className="text-red-500 hover:text-red-700 p-1"
-                                            title="Delete query"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                            placeholder="e.g., greet, goodbye"
+                                        />
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {selectedQuery && (
-                        <div className="mt-4 border-t pt-4">
-                            <h3 className="font-semibold mb-2">
-                                Add to Intent
-                            </h3>
-                            <div className="flex">
-                                <select
-                                    value={currentIntent.intent_name}
-                                    onChange={(e) =>
-                                        setCurrentIntent({
-                                            ...currentIntent,
-                                            intent_name: e.target.value,
-                                        })
-                                    }
-                                    className="flex-1 p-2 border rounded-l"
-                                >
-                                    <option value="">Select Intent</option>
-                                    {intents.map((intent) => (
-                                        <option
-                                            key={intent._id}
-                                            value={intent.intent_name}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="response">
+                                            Response
+                                        </Label>
+                                        <Input
+                                            id="response"
+                                            value={currentRule.response}
+                                            onChange={(e) =>
+                                                setCurrentRule({
+                                                    ...currentRule,
+                                                    response: e.target.value,
+                                                })
+                                            }
+                                            placeholder="e.g., Hello, Goodbye"
+                                        />
+                                    </div>
+                                    <div className="flex justify-end space-x-2">
+                                        {editRuleMode && (
+                                            <Button
+                                                type="button"
+                                                onClick={resetRuleForm}
+                                                variant="outline"
+                                            >
+                                                Cancel
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="submit"
+                                            disabled={loading}
                                         >
-                                            {intent.intent_name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <button
-                                    onClick={handleAddQueryToIntent}
-                                    className="bg-[#dda15e] text-white px-4 py-2 rounded-r"
-                                    disabled={!currentIntent.intent_name}
-                                >
-                                    Add
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+                                            {loading
+                                                ? "Saving..."
+                                                : editRuleMode
+                                                ? "Update Rule"
+                                                : "Create Rule"}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        {/* Existing Rules */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Existing Rules</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {loading && (
+                                    <p className="text-gray-500">Loading...</p>
+                                )}
+
+                                {rules.length === 0 && !loading ? (
+                                    <p className="text-gray-500">
+                                        No rules found. Create your first one!
+                                    </p>
+                                ) : (
+                                    <ScrollArea className="h-[400px] rounded-md border">
+                                        <div className="space-y-2 p-2">
+                                            {rules.map((rule) => (
+                                                <div
+                                                    key={rule._id}
+                                                    className="p-4 border rounded-lg"
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <div>
+                                                            <h3 className="font-medium">
+                                                                {rule.intent}
+                                                            </h3>
+                                                            <p className="text-sm text-gray-600">
+                                                                Response:{" "}
+                                                                {rule.response}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex space-x-2">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    handleEditRule(
+                                                                        rule
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    confirmDelete(
+                                                                        "rule",
+                                                                        rule._id
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="h-4 w-4 text-red-500" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Queries Tab */}
+                    <TabsContent value="queries">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center">
+                                    <AlertTriangle className="mr-2 h-5 w-5 text-yellow-500" />
+                                    Unclassified Queries
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {unclassifiedQueries.length === 0 ? (
+                                    <p className="text-gray-600">
+                                        No unclassified queries found.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {unclassifiedQueries.map((query) => (
+                                            <div
+                                                key={query._id}
+                                                className={`p-3 rounded-md ${
+                                                    selectedQuery?._id ===
+                                                    query._id
+                                                        ? "bg-blue-50 border border-blue-200"
+                                                        : "bg-gray-50"
+                                                } cursor-pointer hover:bg-gray-100 transition-colors`}
+                                                onClick={() =>
+                                                    setSelectedQuery(query)
+                                                }
+                                            >
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex-1">
+                                                        <p className="text-gray-800">
+                                                            {query.text}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 mt-1">
+                                                            {new Date(
+                                                                query.date
+                                                            ).toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            confirmDelete(
+                                                                "query",
+                                                                query._id
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {selectedQuery && (
+                                    <div className="mt-4">
+                                        <Separator className="my-4" />
+                                        <h3 className="font-medium mb-2">
+                                            Add to Intent
+                                        </h3>
+                                        <div className="flex space-x-2">
+                                            <Select
+                                                value={
+                                                    currentIntent.intent_name
+                                                }
+                                                onValueChange={(value) =>
+                                                    setCurrentIntent({
+                                                        ...currentIntent,
+                                                        intent_name: value,
+                                                    })
+                                                }
+                                            >
+                                                <SelectTrigger className="w-full">
+                                                    <SelectValue placeholder="Select Intent" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {intents.map((intent) => (
+                                                        <SelectItem
+                                                            key={intent._id}
+                                                            value={
+                                                                intent.intent_name
+                                                            }
+                                                        >
+                                                            {intent.intent_name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                onClick={handleAddQueryToIntent}
+                                                disabled={
+                                                    !currentIntent.intent_name
+                                                }
+                                            >
+                                                Add
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+
+                {/* Delete Confirmation Dialog */}
+                <AlertDialog
+                    open={deleteDialogOpen}
+                    onOpenChange={setDeleteDialogOpen}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Are you absolutely sure?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will
+                                permanently delete the {itemToDelete.type}.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={executeDelete}>
+                                Continue
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );
 };
 
 export default Admin;
-
-// import React, { useState, useEffect } from "react";
-// import { useNavigate } from "react-router-dom";
-// import axios from "axios";
-// import { AlertTriangle, Trash2 } from "lucide-react";
-
-// const Admin = () => {
-//     const navigate = useNavigate();
-//     const [intents, setIntents] = useState([]);
-//     const [unclassifiedQueries, setUnclassifiedQueries] = useState([]);
-//     const [currentIntent, setCurrentIntent] = useState({
-//         intent_name: "",
-//         examples: [],
-//     });
-
-//     const [example, setExample] = useState("");
-//     const [editMode, setEditMode] = useState(false);
-//     const [loading, setLoading] = useState(false);
-//     const [selectedQuery, setSelectedQuery] = useState(null);
-
-//     // Fetch data on component mount
-//     useEffect(() => {
-//         const fetchData = async () => {
-//             setLoading(true);
-//             try {
-//                 const [intentsRes, queriesRes] = await Promise.all([
-//                     axios.get("http://localhost:5000/intents"),
-//                     axios.get("http://localhost:5000/unclassified-queries"),
-//                 ]);
-//                 setIntents(intentsRes.data);
-//                 setUnclassifiedQueries(queriesRes.data);
-//             } catch (error) {
-//                 console.error("Error fetching data:", error);
-//             } finally {
-//                 setLoading(false);
-//             }
-//         };
-//         fetchData();
-//     }, []);
-
-//     const handleSubmit = async (e) => {
-//         e.preventDefault();
-//         if (!currentIntent.intent_name.trim()) return;
-
-//         setLoading(true);
-//         try {
-//             await axios[editMode ? "put" : "post"](
-//                 `http://localhost:5000/intents${
-//                     editMode ? `/${currentIntent._id}` : ""
-//                 }`,
-//                 currentIntent
-//             );
-//             const { data } = await axios.get("http://localhost:5000/intents");
-//             setIntents(data);
-//             resetForm();
-//         } catch (error) {
-//             console.error("Error saving intent:", error);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-
-//     const resetForm = () => {
-//         setCurrentIntent({ intent_name: "", examples: [] });
-//         setEditMode(false);
-//     };
-
-//     const handleDeleteIntent = async (id) => {
-//         if (!window.confirm("Are you sure you want to delete this intent?"))
-//             return;
-
-//         setLoading(true);
-//         try {
-//             await axios.delete(`http://localhost:5000/intents/${id}`);
-//             setIntents(intents.filter((intent) => intent._id !== id));
-//         } catch (error) {
-//             console.error("Error deleting intent:", error);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-
-//     const handleAddExample = () => {
-//         if (!example.trim()) return;
-//         setCurrentIntent({
-//             ...currentIntent,
-//             examples: [...currentIntent.examples, example],
-//         });
-//         setExample("");
-//     };
-
-//     const handleAddQueryToIntent = async () => {
-//         if (!selectedQuery || !currentIntent.intent_name) return;
-
-//         try {
-//             await axios.post(
-//                 "http://localhost:5000/unclassified-queries/handle",
-//                 {
-//                     queryId: selectedQuery._id,
-//                     intentName: currentIntent.intent_name,
-//                     example: selectedQuery.text,
-//                 }
-//             );
-
-//             // Update state after successful operation
-//             setUnclassifiedQueries(
-//                 unclassifiedQueries.filter((q) => q._id !== selectedQuery._id)
-//             );
-//             const { data } = await axios.get("http://localhost:5000/intents");
-//             setIntents(data);
-//             setSelectedQuery(null);
-//             resetForm();
-//         } catch (error) {
-//             console.error("Error adding query to intent:", error);
-//         }
-//     };
-
-//     // Updated function to handle deleting unclassified queries
-//     const handleDeleteQuery = async (queryId) => {
-//         setLoading(true);
-//         try {
-//             await axios.delete(
-//                 `http://localhost:5000/unclassified-queries/${queryId}`
-//             );
-//             setUnclassifiedQueries(
-//                 unclassifiedQueries.filter((q) => q._id !== queryId)
-//             );
-//             if (selectedQuery && selectedQuery._id === queryId) {
-//                 setSelectedQuery(null);
-//             }
-//         } catch (error) {
-//             console.error("Error deleting query:", error);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-
-//     return (
-//         <div className="flex flex-col min-h-screen bg-[#fefae0] p-4">
-//             <div className="container mx-auto max-w-6xl">
-//                 <nav className="flex justify-between mb-6">
-//                     <h1 className="text-3xl font-bold">Intent Management</h1>
-//                     <button
-//                         onClick={() => navigate("/")}
-//                         className="bg-[#606c38] text-white px-4 py-2 rounded hover:bg-[#283618]"
-//                     >
-//                         Back to Chat
-//                     </button>
-//                 </nav>
-
-//                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-//                     {/* Intent Form */}
-//                     <div className="bg-[#f5ebe0] p-6 rounded-lg shadow">
-//                         <h2 className="text-xl font-semibold mb-4">
-//                             {editMode ? "Edit Intent" : "Add New Intent"}
-//                         </h2>
-//                         <form onSubmit={handleSubmit}>
-//                             <div className="mb-4">
-//                                 <label className="block mb-2">
-//                                     Intent Name
-//                                 </label>
-//                                 <input
-//                                     type="text"
-//                                     value={currentIntent.intent_name}
-//                                     onChange={(e) =>
-//                                         setCurrentIntent({
-//                                             ...currentIntent,
-//                                             intent_name: e.target.value,
-//                                         })
-//                                     }
-//                                     className="w-full p-2 border rounded"
-//                                     placeholder="e.g., greet, goodbye, thank_you"
-//                                     required
-//                                 />
-//                             </div>
-
-//                             <div className="mb-4">
-//                                 <label className="block mb-2">Examples</label>
-//                                 <div className="flex mb-2">
-//                                     <input
-//                                         type="text"
-//                                         value={example}
-//                                         onChange={(e) =>
-//                                             setExample(e.target.value)
-//                                         }
-//                                         className="flex-1 p-2 border rounded-l"
-//                                         placeholder="Add an example phrase"
-//                                     />
-//                                     <button
-//                                         type="button"
-//                                         onClick={handleAddExample}
-//                                         className="bg-[#dda15e] px-4 py-2 rounded-r"
-//                                     >
-//                                         Add
-//                                     </button>
-//                                 </div>
-
-//                                 <div className="bg-white p-3 rounded max-h-40 overflow-y-auto">
-//                                     {currentIntent.examples.length === 0 ? (
-//                                         <p className="text-gray-500">
-//                                             No examples added yet
-//                                         </p>
-//                                     ) : (
-//                                         <ul className="list-disc pl-5">
-//                                             {currentIntent.examples.map(
-//                                                 (ex, index) => (
-//                                                     <li
-//                                                         key={index}
-//                                                         className="flex justify-between items-center mb-1"
-//                                                     >
-//                                                         <span>{ex}</span>
-//                                                         <button
-//                                                             type="button"
-//                                                             onClick={() => {
-//                                                                 const newExamples =
-//                                                                     [
-//                                                                         ...currentIntent.examples,
-//                                                                     ];
-//                                                                 newExamples.splice(
-//                                                                     index,
-//                                                                     1
-//                                                                 );
-//                                                                 setCurrentIntent(
-//                                                                     {
-//                                                                         ...currentIntent,
-//                                                                         examples:
-//                                                                             newExamples,
-//                                                                     }
-//                                                                 );
-//                                                             }}
-//                                                             className="text-red-500 hover:text-red-700"
-//                                                         >
-//                                                             ×
-//                                                         </button>
-//                                                     </li>
-//                                                 )
-//                                             )}
-//                                         </ul>
-//                                     )}
-//                                 </div>
-//                             </div>
-
-//                             <div className="flex justify-between">
-//                                 <button
-//                                     type="submit"
-//                                     className="bg-[#606c38] text-white px-4 py-2 rounded hover:bg-[#283618]"
-//                                     disabled={loading}
-//                                 >
-//                                     {loading
-//                                         ? "Saving..."
-//                                         : editMode
-//                                         ? "Update Intent"
-//                                         : "Create Intent"}
-//                                 </button>
-//                                 {editMode && (
-//                                     <button
-//                                         type="button"
-//                                         onClick={resetForm}
-//                                         className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-700"
-//                                     >
-//                                         Cancel
-//                                     </button>
-//                                 )}
-//                             </div>
-//                         </form>
-//                     </div>
-
-//                     {/* Existing Intents */}
-//                     <div className="bg-[#f5ebe0] p-6 rounded-lg shadow">
-//                         <h2 className="text-xl font-semibold mb-4">
-//                             Existing Intents
-//                         </h2>
-//                         {loading && <p>Loading...</p>}
-
-//                         {intents.length === 0 && !loading ? (
-//                             <p className="text-gray-500">
-//                                 No intents found. Create your first one!
-//                             </p>
-//                         ) : (
-//                             <div className="overflow-y-auto max-h-96">
-//                                 {intents.map((intent) => (
-//                                     <div
-//                                         key={intent._id}
-//                                         className="mb-3 p-3 bg-white rounded shadow-sm"
-//                                     >
-//                                         <div className="flex justify-between items-center mb-2">
-//                                             <h3 className="font-bold">
-//                                                 {intent.intent_name}
-//                                             </h3>
-//                                             <div>
-//                                                 <button
-//                                                     onClick={() =>
-//                                                         setCurrentIntent(
-//                                                             intent
-//                                                         ) || setEditMode(true)
-//                                                     }
-//                                                     className="text-blue-600 hover:text-blue-800 mr-2"
-//                                                 >
-//                                                     Edit
-//                                                 </button>
-//                                                 <button
-//                                                     onClick={() =>
-//                                                         handleDeleteIntent(
-//                                                             intent._id
-//                                                         )
-//                                                     }
-//                                                     className="text-red-600 hover:text-red-800"
-//                                                 >
-//                                                     Delete
-//                                                 </button>
-//                                             </div>
-//                                         </div>
-//                                         <p className="text-sm text-gray-600 mb-1">
-//                                             {intent.examples.length} example
-//                                             {intent.examples.length !== 1
-//                                                 ? "s"
-//                                                 : ""}
-//                                         </p>
-//                                         {intent.examples.length > 0 && (
-//                                             <div className="text-sm text-gray-700 italic">
-//                                                 "{intent.examples[0]}"
-//                                                 {intent.examples.length > 1 &&
-//                                                     " and more..."}
-//                                             </div>
-//                                         )}
-//                                     </div>
-//                                 ))}
-//                             </div>
-//                         )}
-//                     </div>
-
-//                     {/* Unclassified Queries */}
-//                     <div className="bg-[#f5ebe0] p-6 rounded-lg shadow">
-//                         <h2 className="text-xl font-semibold mb-4 flex items-center">
-//                             <AlertTriangle className="mr-2 text-yellow-500" />
-//                             Unclassified Queries
-//                         </h2>
-
-//                         {unclassifiedQueries.length === 0 ? (
-//                             <p className="text-gray-600">
-//                                 No unclassified queries found.
-//                             </p>
-//                         ) : (
-//                             <div className="space-y-3">
-//                                 {unclassifiedQueries.map((query) => (
-//                                     <div
-//                                         key={query._id}
-//                                         className={`p-3 rounded-md ${
-//                                             selectedQuery?._id === query._id
-//                                                 ? "bg-blue-100 border-2 border-blue-300"
-//                                                 : "bg-gray-100"
-//                                         } cursor-pointer hover:bg-gray-200 transition-colors`}
-//                                     >
-//                                         <div className="flex justify-between items-start">
-//                                             <div
-//                                                 className="flex-1"
-//                                                 onClick={() =>
-//                                                     setSelectedQuery(query)
-//                                                 }
-//                                             >
-//                                                 <p className="text-gray-800 truncate">
-//                                                     {query.text}
-//                                                 </p>
-//                                                 <p className="text-xs text-gray-500">
-//                                                     {new Date(
-//                                                         query.date
-//                                                     ).toLocaleString()}
-//                                                 </p>
-//                                             </div>
-//                                             <button
-//                                                 onClick={(e) => {
-//                                                     e.stopPropagation();
-//                                                     handleDeleteQuery(
-//                                                         query._id
-//                                                     );
-//                                                 }}
-//                                                 className="text-red-500 hover:text-red-700 p-1"
-//                                                 title="Delete query"
-//                                             >
-//                                                 <Trash2 size={16} />
-//                                             </button>
-//                                         </div>
-//                                     </div>
-//                                 ))}
-//                             </div>
-//                         )}
-
-//                         {selectedQuery && (
-//                             <div className="mt-4 border-t pt-4">
-//                                 <h3 className="font-semibold mb-2">
-//                                     Add to Intent
-//                                 </h3>
-//                                 <div className="flex">
-//                                     <select
-//                                         value={currentIntent.intent_name}
-//                                         onChange={(e) =>
-//                                             setCurrentIntent({
-//                                                 ...currentIntent,
-//                                                 intent_name: e.target.value,
-//                                             })
-//                                         }
-//                                         className="flex-1 p-2 border rounded-l"
-//                                     >
-//                                         <option value="">Select Intent</option>
-//                                         {intents.map((intent) => (
-//                                             <option
-//                                                 key={intent._id}
-//                                                 value={intent.intent_name}
-//                                             >
-//                                                 {intent.intent_name}
-//                                             </option>
-//                                         ))}
-//                                     </select>
-//                                     <button
-//                                         onClick={handleAddQueryToIntent}
-//                                         className="bg-[#dda15e] text-white px-4 py-2 rounded-r"
-//                                         disabled={!currentIntent.intent_name}
-//                                     >
-//                                         Add
-//                                     </button>
-//                                 </div>
-//                             </div>
-//                         )}
-//                     </div>
-//                 </div>
-//             </div>
-//         </div>
-//     );
-// };
-
-// export default Admin;

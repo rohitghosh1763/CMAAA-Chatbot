@@ -150,6 +150,3 @@ class MongoDBIntentClassifier(GraphComponent):
     def persist(self) -> None:
         """Nothing to persist as the data is stored in MongoDB."""
         pass
-
-
-

@@ -7,25 +7,15 @@ class ActionFetchResponse(Action):
         return "action_fetch_response"
 
     def run(self, dispatcher, tracker, domain):
-        user_intent = tracker.latest_message['intent'].get('name')
-
-        #? MongoDB Connection
-        client = MongoClient("mongodb://localhost:27017/")
-        db = client["CMAAA"]
-        rules_collection = db["rules"]  # ✅ Lookup rules instead of default Rasa rules
-
-        #? Fetch rule from MongoDB
-        rule_data = rules_collection.find_one({"intent": user_intent})
-
-        if rule_data and "response" in rule_data:  # ✅ Check if response exists
-            response_text = rule_data["response"]
+        # Get the response that was already set by MongoDBIntentClassifier
+        response_text = tracker.latest_message.get("response")
+        
+        if response_text:
             dispatcher.utter_message(text=response_text)
         else:
             dispatcher.utter_message(text="I am not sure how to respond.")
-
-        client.close()  # ✅ Close the connection
+        
         return []
-
 
 
 # from pymongo import MongoClient
