@@ -1,46 +1,75 @@
-from pymongo import MongoClient
-from rasa_sdk import Action
+from typing import Dict, Text, Any, List
+from rasa_sdk import Action, Tracker
 from rasa_sdk.events import SlotSet
+from rasa_sdk.events import UserUtteranceReverted
+from rasa_sdk.executor import CollectingDispatcher
+from colorama import Fore, Style, init
+
+init(autoreset=True)
 
 class ActionFetchResponse(Action):
-    def name(self):
+    """Enhanced action with CLI feedback and better error handling."""
+
+    def name(self) -> Text:
         return "action_fetch_response"
 
-    def run(self, dispatcher, tracker, domain):
-        # Get the response that was already set by MongoDBIntentClassifier
-        response_text = tracker.latest_message.get("response")
+    def run(
+        self,
+        dispatcher: CollectingDispatcher,
+        tracker: Tracker,
+        domain: Dict[Text, Any]
+    ) -> List[Dict[Text, Any]]:
         
-        if response_text:
-            dispatcher.utter_message(text=response_text)
-        else:
-            dispatcher.utter_message(text="I am not sure how to respond.")
+        try:
+            # Get response from tracker
+            response_text = tracker.latest_message.get("response")
+            intent = tracker.latest_message.get("intent", {})
+            intent_name = intent.get("intent_name", "nlu_fallback")
+            confidence = intent.get("confidence", 0.0)
+            
+            # Print classification info to CLI
+            print(Fore.CYAN + "\n" + "="*50)
+            print(Fore.YELLOW + f"Intent: {intent_name}")
+            print(Fore.YELLOW + f"Confidence: {confidence:.2f}")
+            
+            if response_text:
+                print(Fore.GREEN + f"Response: {response_text}")
+                dispatcher.utter_message(text=response_text)
+            else:
+                if intent_name == "nlu_fallback":
+                    fallback_msg = "I didn't understand that. Could you rephrase?"
+                    print(Fore.RED + "No response found - using fallback")
+                else:
+                    fallback_msg = "I'm not sure how to respond to that."
+                    print(Fore.YELLOW + "No response rule for this intent")
+                
+                dispatcher.utter_message(text=fallback_msg)
+            
+            print(Fore.CYAN + "="*50 + "\n" + Style.RESET_ALL)
+            
+        except Exception as e:
+            error_msg = f"Error in ActionFetchResponse: {str(e)}"
+            print(Fore.RED + error_msg)
+            dispatcher.utter_message(text="Sorry, I encountered an error processing your request.")
         
         return []
 
+class ActionDefaultFallback(Action):
+    """Enhanced fallback action with CLI feedback."""
+    
+    def name(self) -> Text:
+        return "action_default_fallback"
 
-# from pymongo import MongoClient
-# from rasa_sdk import Action
-# from rasa_sdk.events import SlotSet
-
-# class ActionFetchResponse(Action):
-#     def name(self):
-#         return "action_fetch_response"
-
-#     def run(self, dispatcher, tracker, domain):
-#         user_intent = tracker.latest_message['intent'].get('name')
-
-#         #? MongoDB Connection
-#         client = MongoClient("mongodb://localhost:27017/")
-#         db = client["CMAAA"]
-#         intents_collection = db["intents"]
-
-#         #? Fetching responses from MongoDB
-#         intent_data = intents_collection.find_one({"intent": user_intent})
-
-#         if intent_data and "responses" in intent_data:
-#             response_text = intent_data["responses"][0]  # Choose first response
-#             dispatcher.utter_message(text=response_text)
-#         else:
-#             dispatcher.utter_message(text="I am not sure how to respond.")
-
-#         return []
+    def run(
+        self,
+        dispatcher: CollectingDispatcher,
+        tracker: "Tracker",
+        domain: Dict[Text, Any]
+    ) -> List[Dict[Text, Any]]:
+        
+        print(Fore.RED + "\n" + "!"*50)
+        print(Fore.RED + "DEFAULT FALLBACK TRIGGERED")
+        print(Fore.RED + "!"*50 + "\n")
+        
+        dispatcher.utter_message(template="utter_default")
+        return [UserUtteranceReverted()]

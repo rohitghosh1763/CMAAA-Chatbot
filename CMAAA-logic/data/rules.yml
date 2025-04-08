@@ -6,12 +6,4 @@ rules:
           - intent: null # Match any intent
           - action: action_fetch_response
 
-    # - rule: Fetch response from MongoDB
-    #   steps:
-    #       - intent: greet
-    #       - action: action_fetch_response
-
-    # - rule: Fetch response from MongoDB
-    #   steps:
-    #       - intent: goodbye
-    #       - action: action_fetch_response
+ 
