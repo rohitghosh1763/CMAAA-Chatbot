@@ -1,6 +1,0 @@
-mongodb:
-    uri: "mongodb://localhost:27017/"
-    db_name: "CMAAA"
-    collection_name: "intents"
-    rules_collection_name: "rules"
-    unclassified_collection_name: "unclassified_queries"
