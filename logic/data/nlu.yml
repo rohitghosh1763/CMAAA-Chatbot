@@ -15,8 +15,9 @@ nlu:
       - hey dude
       - goodmorning
       - goodevening
-      - good afternoon
+      - good morning
       - kaise ho
+      - hello world everyone
   - intent: goodbye
     examples: |-
       - cu

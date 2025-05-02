@@ -9,15 +9,15 @@ import re
 
 app = FastAPI()
 
-# Allow React frontend (running on port 3000) to access this API
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Path to your Rasa files (adjust as needed)
+# Path to the Rasa files 
 RASA_ROOT = Path(os.getenv("RASA_PATH", "../../logic"))  # Goes up to your-rasa-project/
 NLU_PATH = RASA_ROOT / "data" / "nlu.yml"
 
@@ -143,89 +143,4 @@ def rasa_shell():
         }
     except Exception as e:
         raise HTTPException(500, f"Shell failed: {str(e)}")
-
-# from fastapi import FastAPI, HTTPException, Body
-# from fastapi.middleware.cors import CORSMiddleware
-# import subprocess
-# from pathlib import Path
-# import os
-# from ruamel.yaml import YAML
-# from pydantic import BaseModel
-
-# app = FastAPI()
-
-# # Allow React frontend (running on port 3000) to access this API
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["http://localhost:3000"],
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # Path to your Rasa files (adjust as needed)
-# RASA_ROOT = Path(os.getenv("RASA_PATH", "../../logic")) # Goes up to your-rasa-project/
-# NLU_PATH = RASA_ROOT / "data" / "nlu.yml"
-
-# class NLUContent(BaseModel):
-#     content: dict  # Changed from str to dict to match frontend
-
-# @app.get("/")
-# async def root():
-#     return {"message": "Admin panel API is running!"}
-
-# @app.get("/nlu")
-# def get_nlu():
-#     """Read current nlu.yml content"""
-#     if not NLU_PATH.exists():
-#         raise HTTPException(404, "nlu.yml not found")
-#     yaml = YAML()
-#     with open(NLU_PATH, "r") as f:
-#         return {"content": yaml.load(f)}
-
-# @app.post("/nlu")
-# def update_nlu(nlu_data: NLUContent):
-#     """Save edits to nlu.yml"""
-#     yaml = YAML()
-#     try:
-#         with open(NLU_PATH, "w") as f:
-#             yaml.dump(nlu_data.content, f)
-#         return {"success": True}
-#     except Exception as e:
-#         raise HTTPException(500, f"Failed to save: {str(e)}")
-
-# @app.post("/train")
-# def train_model():
-#     """Trigger Rasa training"""
-#     try:
-#         result = subprocess.run(
-#             ["rasa", "train"],
-#             cwd=str(RASA_ROOT),
-#             capture_output=True,
-#             text=True
-#         )
-#         return {
-#             "success": result.returncode == 0,
-#             "output": result.stdout,
-#             "error": result.stderr
-#         }
-#     except Exception as e:
-#         raise HTTPException(500, f"Training failed: {str(e)}")
-      
-# @app.post("/shell")
-# def rasa_shell():  # Renamed from train_model to avoid duplicate function names
-#     """Trigger Rasa Shell"""
-#     try:
-#         result = subprocess.run(
-#             ["rasa", "shell"],
-#             cwd=str(RASA_ROOT),
-#             capture_output=True,
-#             text=True
-#         )
-#         return {
-#             "success": result.returncode == 0,
-#             "output": result.stdout,
-#             "error": result.stderr
-#         }
-#     except Exception as e:
-#         raise HTTPException(500, f"Shell failed: {str(e)}")
 
