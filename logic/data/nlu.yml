@@ -17,7 +17,7 @@ nlu:
       - goodevening
       - good morning
       - kaise ho
-      - hello world everyone
+      - hello world
   - intent: goodbye
     examples: |-
       - cu
