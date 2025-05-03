@@ -1,6 +1,6 @@
 import React from "react";
 import "./App.css";
-import IntentEditor from "./components/IntentEditor";
+import IntentEditor from "./components/Intents";
 
 function App() {
     return <IntentEditor />;
