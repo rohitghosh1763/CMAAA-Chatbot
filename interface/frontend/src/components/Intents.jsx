@@ -15,20 +15,26 @@ import {
     Settings,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const Intents = () => {
-    const navigate = useNavigate; // Placeholder for navigation
+    const navigate = useNavigate(); // Properly initialize useNavigate hook
+    const location = useLocation(); // Get current location
     const [activeTab, setActiveTab] = useState("intents");
     const [nluData, setNluData] = useState({ version: "3.1", nlu: [] });
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState(null);
 
-    // Navigate function (placeholder)
+    // Set active tab based on current path when component mounts
+    useEffect(() => {
+        const path = location.pathname.replace("/", "") || "intents";
+        setActiveTab(path);
+    }, [location]);
+
+    // Navigate function
     const handleNavigate = (route) => {
         setActiveTab(route);
-        // This would navigate to the route in a real implementation
-        // navigate(`/${route}`);
+        navigate(`/${route}`);
     };
 
     useEffect(() => {
@@ -117,8 +123,8 @@ const Intents = () => {
         setNluData({
             ...nluData,
             nlu: [
-                ...nluData.nlu,
                 { intent: "new_intent", examples: "- example1\n- example2" },
+                ...nluData.nlu,
             ],
         });
     };
@@ -436,11 +442,7 @@ const Intents = () => {
                                 Define conversation rules and response patterns
                             </p>
                             <button
-                                onClick={() =>
-                                    console.log(
-                                        "Navigate to /rules implementation"
-                                    )
-                                }
+                                onClick={() => handleNavigate("rules")}
                                 className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                             >
                                 Configure Rules
@@ -466,11 +468,7 @@ const Intents = () => {
                                 Create and manage conversational flows
                             </p>
                             <button
-                                onClick={() =>
-                                    console.log(
-                                        "Navigate to /stories implementation"
-                                    )
-                                }
+                                onClick={() => handleNavigate("stories")}
                                 className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                             >
                                 Manage Stories
@@ -496,11 +494,7 @@ const Intents = () => {
                                 Define responses, forms, and entities
                             </p>
                             <button
-                                onClick={() =>
-                                    console.log(
-                                        "Navigate to /domain implementation"
-                                    )
-                                }
+                                onClick={() => handleNavigate("domain")}
                                 className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                             >
                                 Configure Domain
@@ -528,11 +522,7 @@ const Intents = () => {
                                 intents
                             </p>
                             <button
-                                onClick={() =>
-                                    console.log(
-                                        "Navigate to /unknown implementation"
-                                    )
-                                }
+                                onClick={() => handleNavigate("unknown")}
                                 className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                             >
                                 Analyze Queries
@@ -553,7 +543,10 @@ const Intents = () => {
                     <div className="flex items-center justify-between h-16 px-4">
                         <div className="flex items-center space-x-2">
                             <Settings className="text-indigo-200" size={24} />
-                            <span className="text-white font-bold text-xl">
+                            <span
+                                className="text-white font-bold text-xl cursor-pointer"
+                                onClick={() => handleNavigate("intents")}
+                            >
                                 Rasa Studio
                             </span>
                         </div>
