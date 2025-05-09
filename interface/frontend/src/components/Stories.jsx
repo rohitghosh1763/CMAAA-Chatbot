@@ -1,46 +1,34 @@
 import React, { useState, useEffect } from "react";
 import {
-    Save,
-    Plus,
-    Trash2,
-    Zap,
-    AlertCircle,
-    Check,
-    ArrowDown,
-    ArrowUp,
-    PlusCircle,
-    MinusCircle,
-    Settings,
-    FileText,
-    Code,
-    Map,
-    Database,
+    Save, Plus, Trash2, Zap, AlertCircle, Check, Settings, FileText, Code, Map, Database,
+    ChevronDown, ChevronUp, Edit3, ArrowUp, ArrowDown, PlusCircle, MinusCircle, ListChecks, GripVertical,
+    Loader 
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button"; 
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"; 
+import { Input } from "@/components/ui/input"; 
+import { Label } from "@/components/ui/label"; 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; 
 import { useNavigate, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion"; 
 
 const Stories = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [activeTab, setActiveTab] = useState("stories");
-    const [storiesData, setStoriesData] = useState({
-        version: "3.1",
-        stories: [],
-    });
+    const [storiesData, setStoriesData] = useState({ version: "3.1", stories: [] });
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState(null);
+    const [editingStoryName, setEditingStoryName] = useState(null); 
+    const [expandedCards, setExpandedCards] = useState({}); 
 
-    // Set active tab based on current path when component mounts
     useEffect(() => {
         const path = location.pathname.replace("/", "") || "stories";
         setActiveTab(path);
     }, [location]);
 
-    // Navigate function
-    const handleNavigate = (route) => {
-        setActiveTab(route);
-        navigate(`/${route}`);
-    };
+    // Removed handleNavigate as it's part of Navbar.jsx
 
     useEffect(() => {
         if (activeTab === "stories") {
@@ -52,59 +40,100 @@ const Stories = () => {
         setLoading(true);
         try {
             const response = await fetch("http://localhost:8000/stories");
-            if (!response.ok)
-                throw new Error(`HTTP error! Status: ${response.status}`);
-
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             const data = await response.json();
-            setStoriesData(data.content);
-        } catch (err) {
-            setToast({
-                type: "error",
-                message: `Failed to fetch stories data: ${err.message}`,
+            const contentStories = data.content?.stories || [];
+            setStoriesData({ version: data.content?.version || "3.1", stories: contentStories });
+
+            const initialExpandedState = {};
+            contentStories.forEach((_, index) => {
+                initialExpandedState[index] = false; 
             });
+            setExpandedCards(initialExpandedState);
+        } catch (err) {
+            setToast({ type: "error", message: `Failed to fetch stories data: ${err.message}` });
+            setStoriesData({ version: "3.1", stories: [] });
         } finally {
             setLoading(false);
         }
     };
 
-    const handleStoryChange = (index, field, value) => {
+    const handleStoryNameChange = (index, newName) => {
         const updatedStories = [...storiesData.stories];
-        updatedStories[index] = { ...updatedStories[index], [field]: value };
+        updatedStories[index] = { ...updatedStories[index], story: newName };
         setStoriesData({ ...storiesData, stories: updatedStories });
+    };
+
+    const startEditingStoryName = (index, name, e) => {
+        e.stopPropagation();
+        setEditingStoryName({ index, name });
+    };
+
+    const handleStoryNameSave = (index) => {
+        if (editingStoryName && editingStoryName.index === index) {
+            const newName = editingStoryName.name.trim();
+            if (newName === "") {
+                setToast({ type: "error", message: "Story name cannot be empty." });
+                return;
+            }
+            handleStoryNameChange(index, newName);
+            setEditingStoryName(null);
+        }
+    };
+
+    const handleStoryNameInputChange = (e) => {
+        if (editingStoryName !== null) {
+            setEditingStoryName({ ...editingStoryName, name: e.target.value });
+        }
     };
 
     const addStory = () => {
-        setStoriesData({
-            ...storiesData,
-            stories: [
-                {
-                    story: "New story",
-                    steps: [
-                        { intent: "example_intent" },
-                        { action: "example_action" },
-                    ],
-                },
-                ...storiesData.stories,
-            ],
+        const newStory = {
+            story: `New Story ${(storiesData.stories?.length || 0) + 1}`,
+            steps: [{ intent: "example_intent" }, { action: "example_action" }],
+        };
+        const updatedStories = [newStory, ...(storiesData.stories || [])];
+        setStoriesData({ ...storiesData, stories: updatedStories });
+
+        const newExpandedCards = { 0: true }; 
+        Object.keys(expandedCards).forEach(key => {
+            newExpandedCards[parseInt(key) + 1] = expandedCards[key];
         });
+        setExpandedCards(newExpandedCards);
     };
 
     const removeStory = (index) => {
-        const updatedStories = [...storiesData.stories];
-        updatedStories.splice(index, 1);
+        const updatedStories = storiesData.stories.filter((_, i) => i !== index);
         setStoriesData({ ...storiesData, stories: updatedStories });
+
+        setExpandedCards(prev => {
+            const newExpanded = {};
+            updatedStories.forEach((_, i) => {
+                const originalOldIndex = i < index ? i : i + 1;
+                if (prev[originalOldIndex] !== undefined) {
+                    newExpanded[i] = prev[originalOldIndex];
+                } else {
+                     const correspondingOldKey = Object.keys(prev).find(k => parseInt(k) === originalOldIndex);
+                    if(correspondingOldKey !== undefined) {
+                        newExpanded[i] = prev[correspondingOldKey];
+                    } else {
+                        newExpanded[i] = false; 
+                    }
+                }
+            });
+            Object.keys(newExpanded).forEach(key => {
+                if (parseInt(key) >= updatedStories.length) {
+                    delete newExpanded[key];
+                }
+            });
+            return newExpanded;
+        });
     };
 
     const addStep = (storyIndex) => {
         const updatedStories = [...storiesData.stories];
         const currentSteps = updatedStories[storyIndex].steps || [];
-
-        // Default to adding an intent step
-        updatedStories[storyIndex].steps = [
-            ...currentSteps,
-            { intent: "example_intent" },
-        ];
-
+        updatedStories[storyIndex].steps = [...currentSteps, { intent: "new_intent" }]; 
         setStoriesData({ ...storiesData, stories: updatedStories });
     };
 
@@ -115,37 +144,21 @@ const Stories = () => {
     };
 
     const moveStep = (storyIndex, stepIndex, direction) => {
-        if (direction !== "up" && direction !== "down") return;
-
         const updatedStories = [...storiesData.stories];
         const steps = updatedStories[storyIndex].steps;
-
         if (direction === "up" && stepIndex > 0) {
-            // Move step up
-            [steps[stepIndex], steps[stepIndex - 1]] = [
-                steps[stepIndex - 1],
-                steps[stepIndex],
-            ];
+            [steps[stepIndex], steps[stepIndex - 1]] = [steps[stepIndex - 1], steps[stepIndex]];
         } else if (direction === "down" && stepIndex < steps.length - 1) {
-            // Move step down
-            [steps[stepIndex], steps[stepIndex + 1]] = [
-                steps[stepIndex + 1],
-                steps[stepIndex],
-            ];
+            [steps[stepIndex], steps[stepIndex + 1]] = [steps[stepIndex + 1], steps[stepIndex]];
         }
-
         setStoriesData({ ...storiesData, stories: updatedStories });
     };
 
     const handleStepChange = (storyIndex, stepIndex, key, value) => {
         const updatedStories = [...storiesData.stories];
-
-        // If the step exists, update it
         if (updatedStories[storyIndex].steps[stepIndex]) {
-            // Create a new step with only the new key-value pair
             updatedStories[storyIndex].steps[stepIndex] = { [key]: value };
         }
-
         setStoriesData({ ...storiesData, stories: updatedStories });
     };
 
@@ -153,12 +166,7 @@ const Stories = () => {
         const updatedStories = [...storiesData.stories];
         const currentStep = updatedStories[storyIndex].steps[stepIndex];
         const currentValue = Object.values(currentStep)[0] || "";
-
-        // Replace the step with a new one of the selected type
-        updatedStories[storyIndex].steps[stepIndex] = {
-            [newType]: currentValue,
-        };
-
+        updatedStories[storyIndex].steps[stepIndex] = { [newType]: currentValue };
         setStoriesData({ ...storiesData, stories: updatedStories });
     };
 
@@ -170,20 +178,11 @@ const Stories = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content: storiesData }),
             });
-
-            if (!response.ok)
-                throw new Error(`HTTP error! Status: ${response.status}`);
-
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             await response.json();
-            setToast({
-                type: "success",
-                message: "Stories saved successfully!",
-            });
+            setToast({ type: "success", message: "Stories saved successfully!" });
         } catch (err) {
-            setToast({
-                type: "error",
-                message: `Failed to save stories: ${err.message}`,
-            });
+            setToast({ type: "error", message: `Failed to save stories: ${err.message}` });
         } finally {
             setLoading(false);
         }
@@ -191,469 +190,247 @@ const Stories = () => {
 
     const handleTrain = async () => {
         setLoading(true);
-        setToast({
-            type: "info",
-            message: "Training model... This may take a while.",
-        });
-
+        setToast({ type: "info", message: "Training model... This may take a while." });
         try {
-            const response = await fetch("http://localhost:8000/train", {
-                method: "POST",
-            });
-
-            if (!response.ok)
-                throw new Error(`HTTP error! Status: ${response.status}`);
-
+            const response = await fetch("http://localhost:8000/train", { method: "POST" });
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
             await response.json();
-            setToast({
-                type: "success",
-                message: "Model trained successfully!",
-            });
+            setToast({ type: "success", message: "Model trained successfully!" });
         } catch (err) {
-            setToast({
-                type: "error",
-                message: `Training failed: ${err.message}`,
-            });
+            setToast({ type: "error", message: `Training failed: ${err.message}` });
         } finally {
             setLoading(false);
         }
     };
 
-    // Toast Notification Component - reused from Rules
-    const ToastNotification = () => {
+    const ToastNotification = () => { 
         useEffect(() => {
             if (toast) {
-                const timer = setTimeout(() => {
-                    setToast(null);
-                }, 3000);
+                const timer = setTimeout(() => setToast(null), 3000);
                 return () => clearTimeout(timer);
             }
         }, [toast]);
 
         if (!toast) return null;
 
-        let bgColor = "bg-blue-50";
-        let borderColor = "border-blue-500";
-        let textColor = "text-blue-700";
-        let titleColor = "text-blue-800";
-        let iconColor = "text-blue-500";
-        let Icon = AlertCircle;
-
-        if (toast.type === "success") {
-            bgColor = "bg-green-50";
-            borderColor = "border-green-500";
-            textColor = "text-green-700";
-            titleColor = "text-green-800";
-            iconColor = "text-green-500";
-            Icon = Check;
-        } else if (toast.type === "error") {
-            bgColor = "bg-red-50";
-            borderColor = "border-red-500";
-            textColor = "text-red-700";
-            titleColor = "text-red-800";
-            iconColor = "text-red-500";
-        }
+        const alertVariants = {
+            success: "border-green-500 bg-green-50 text-green-700",
+            error: "border-red-500 bg-red-50 text-red-700",
+            info: "border-blue-500 bg-blue-50 text-blue-700",
+        };
+        const iconColorVariants = {
+            success: "text-green-500", error: "text-red-500", info: "text-blue-500",
+        };
 
         return (
-            <Alert
-                className={`fixed top-4 right-4 w-96 shadow-lg ${bgColor} ${borderColor}`}
+            <motion.div
+                initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                className="fixed top-4 right-4 z-50 w-auto max-w-md"
             >
-                <div className={`p-1 rounded-full ${iconColor}`}>
-                    <Icon size={18} />
-                </div>
-                <AlertTitle className={titleColor}>
-                    {toast.type.charAt(0).toUpperCase() + toast.type.slice(1)}
-                </AlertTitle>
-                <AlertDescription className={textColor}>
-                    {toast.message}
-                </AlertDescription>
-            </Alert>
+                <Alert className={`${alertVariants[toast.type || 'info']} shadow-lg flex items-start p-3`}>
+                    <div className={`p-1 rounded-full ${iconColorVariants[toast.type || 'info']} mr-3 mt-0.5`}>
+                        {toast.type === "success" && <Check size={18} />}
+                        {toast.type === "error" && <AlertCircle size={18} />}
+                        {toast.type === "info" && <AlertCircle size={18} />} 
+                    </div>
+                    <div>
+                        <AlertTitle className={`font-semibold ${toast.type === "success" ? "text-green-800" : toast.type === "error" ? "text-red-800" : "text-blue-800"}`}>
+                            {toast.type === "success" ? "Success" : toast.type === "error" ? "Error" : "Info"}
+                        </AlertTitle>
+                        <AlertDescription className="text-sm">{toast.message}</AlertDescription>
+                    </div>
+                </Alert>
+            </motion.div>
         );
     };
 
-    // Determine the step type and value
     const getStepTypeAndValue = (step) => {
         const key = Object.keys(step)[0];
         const value = step[key];
         return { type: key, value };
     };
 
-    // Tab Button Component - reused from Rules
-    const TabButton = ({ active, onClick, icon, label }) => (
-        <button
-            onClick={onClick}
-            className={`flex items-center px-4 py-3 text-sm font-medium transition-colors duration-200 ${
-                active
-                    ? "bg-indigo-600 text-white"
-                    : "text-gray-600 hover:bg-indigo-50 hover:text-indigo-600"
-            }`}
-        >
-            <span className="mr-2">{icon}</span>
-            {label}
-        </button>
+    const toggleCardExpansion = (index) => {
+        if (editingStoryName && editingStoryName.index === index) {
+            handleStoryNameSave(index); 
+        }
+        setExpandedCards(prev => ({ ...prev, [index]: !prev[index] }));
+    };
+
+    const renderStoriesContent = () => (
+        <div className="p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                <h1 className="text-2xl font-bold text-slate-800">Stories Configuration</h1>
+                <div className="flex space-x-2 sm:space-x-3">
+                    <Button onClick={addStory} variant="default" className="bg-indigo-600 hover:bg-indigo-700">
+                        <Plus size={18} className="mr-2" /> Add Story
+                    </Button>
+                    <Button onClick={handleSave} variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700" disabled={loading || !storiesData.stories || storiesData.stories.length === 0}>
+                        <Save size={18} className="mr-2" /> {loading ? "Saving..." : "Save"}
+                    </Button>
+                    <Button onClick={handleTrain} className="bg-purple-600 hover:bg-purple-700" disabled={loading || !storiesData.stories || storiesData.stories.length === 0}>
+                        <Zap size={18} className="mr-2" /> {loading ? "Training..." : "Train"}
+                    </Button>
+                </div>
+            </div>
+
+            {loading && (!storiesData.stories || storiesData.stories.length === 0) ? (
+                <div className="flex justify-center items-center py-12">
+                    <Loader size={32} className="text-indigo-600 animate-spin" />
+                    <p className="ml-2 text-slate-600">Loading stories...</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <AnimatePresence>
+                        {storiesData.stories && storiesData.stories.map((story, storyIndex) => (
+                            <motion.div
+                                key={story.id || `story-${storyIndex}`}
+                                layout
+                                initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
+                                transition={{ duration: 0.25, ease: "easeInOut" }}
+                            >
+                                <Card className={`border border-slate-300 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden ${expandedCards[storyIndex] ? 'bg-white' : 'bg-slate-50 hover:bg-slate-100'}`}>
+                                    <CardHeader
+                                        className="p-3 cursor-pointer border-b border-slate-200"
+                                        onClick={() => toggleCardExpansion(storyIndex)}
+                                    >
+                                        <div className="flex justify-between items-start gap-x-2">
+                                            <div className="flex-1 min-w-0">
+                                                {editingStoryName?.index === storyIndex ? (
+                                                    <Input
+                                                        type="text"
+                                                        value={editingStoryName.name}
+                                                        onChange={handleStoryNameInputChange}
+                                                        onBlur={() => handleStoryNameSave(storyIndex)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') { e.preventDefault(); handleStoryNameSave(storyIndex); }
+                                                            if (e.key === 'Escape') setEditingStoryName(null);
+                                                        }}
+                                                        className="text-base font-semibold w-full h-8 bg-transparent p-0 border-0 focus:ring-0 focus:outline-none"
+                                                        autoFocus
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                ) : (
+                                                    <CardTitle
+                                                        className="text-base font-semibold text-indigo-700 break-words"
+                                                        title={story.story || "Untitled Story"}
+                                                    >
+                                                        {story.story || "Untitled Story"}
+                                                    </CardTitle>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center shrink-0">
+                                                {!editingStoryName || editingStoryName?.index !== storyIndex ? (
+                                                    <Button variant="ghost" size="icon" className="text-slate-500 hover:text-indigo-600 w-7 h-7" onClick={(e) => startEditingStoryName(storyIndex, story.story || "", e)} title="Edit story name"> <Edit3 size={14} /> </Button>
+                                                ) : (
+                                                    <Button variant="ghost" size="icon" className="text-green-500 hover:text-green-700 w-7 h-7" onClick={(e) => { e.stopPropagation(); handleStoryNameSave(storyIndex); }} title="Save story name"> <Check size={16} /> </Button>
+                                                )}
+                                                <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-700 w-7 h-7 ml-1" title={expandedCards[storyIndex] ? "Collapse story" : "Expand story"}>
+                                                    {expandedCards[storyIndex] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <CardDescription className="text-xs text-slate-500 mt-1.5">
+                                            <ListChecks size={12} className="inline mr-1 align-middle" />
+                                            {story.steps?.length || 0} step(s)
+                                        </CardDescription>
+                                    </CardHeader>
+
+                                    <AnimatePresence>
+                                        {expandedCards[storyIndex] && (
+                                            <motion.section
+                                                key="content"
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: "auto", transition: { duration: 0.3, ease: "easeInOut" } }}
+                                                exit={{ opacity: 0, height: 0, transition: { duration: 0.2, ease: "easeInOut" } }}
+                                                className="overflow-hidden"
+                                            >
+                                                <CardContent className="p-3 space-y-3">
+                                                    <Label className="text-xs font-medium text-slate-700 block mb-1">Steps</Label>
+                                                    {story.steps && story.steps.length > 0 ? (
+                                                        <div className="space-y-2">
+                                                            {story.steps.map((step, stepIndex) => {
+                                                                const { type, value } = getStepTypeAndValue(step);
+                                                                return (
+                                                                    <motion.div
+                                                                        key={step.id || `step-${storyIndex}-${stepIndex}`}
+                                                                        layout="position" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.2 }}
+                                                                        className="flex items-center space-x-2 bg-slate-50 p-2 rounded border border-slate-200"
+                                                                    >
+                                                                        <GripVertical size={16} className="text-slate-400 cursor-grab flex-shrink-0" />
+                                                                        <Select value={type} onValueChange={(newType) => handleStepTypeChange(storyIndex, stepIndex, newType)}>
+                                                                            <SelectTrigger className="w-[130px] h-8 text-xs border-slate-300 flex-shrink-0">
+                                                                                <SelectValue placeholder="Type" />
+                                                                            </SelectTrigger>
+                                                                            <SelectContent>
+                                                                                <SelectItem value="intent">Intent</SelectItem>
+                                                                                <SelectItem value="action">Action</SelectItem>
+                                                                                <SelectItem value="slot_was_set">Slot Set</SelectItem>
+                                                                                <SelectItem value="active_loop">Active Loop</SelectItem>
+                                                                            </SelectContent>
+                                                                        </Select>
+                                                                        
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <Input
+                                                                                type="text" value={value || ""}
+                                                                                onChange={(e) => handleStepChange(storyIndex, stepIndex, type, e.target.value)}
+                                                                                placeholder={`${type} value`}
+                                                                                className="w-full h-8 text-xs border-slate-300"
+                                                                            />
+                                                                        </div>
+
+                                                                        <Button variant="ghost" size="icon" className="w-7 h-7 text-slate-500 hover:text-indigo-600 disabled:text-slate-300 flex-shrink-0" onClick={() => moveStep(storyIndex, stepIndex, "up")} disabled={stepIndex === 0} title="Move up"> <ArrowUp size={14} /> </Button>
+                                                                        <Button variant="ghost" size="icon" className="w-7 h-7 text-slate-500 hover:text-indigo-600 disabled:text-slate-300 flex-shrink-0" onClick={() => moveStep(storyIndex, stepIndex, "down")} disabled={stepIndex === story.steps.length - 1} title="Move down"> <ArrowDown size={14} /> </Button>
+                                                                        <Button variant="ghost" size="icon" className="w-7 h-7 text-red-500 hover:text-red-700 flex-shrink-0" onClick={() => removeStep(storyIndex, stepIndex)} title="Remove step"> <MinusCircle size={14} /> </Button>
+                                                                    </motion.div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-slate-400 italic text-center py-2">No steps in this story.</p>
+                                                    )}
+                                                    <Button size="sm" variant="outline" className="text-xs border-indigo-500 text-indigo-600 hover:bg-indigo-50 w-full mt-2" onClick={() => addStep(storyIndex)}>
+                                                        <PlusCircle size={14} className="mr-1.5" /> Add Step
+                                                    </Button>
+                                                </CardContent>
+                                                <CardFooter className="p-3 border-t border-slate-200">
+                                                    <Button variant="destructive" size="sm" className="w-full text-xs" onClick={(e) => { e.stopPropagation(); removeStory(storyIndex); }}>
+                                                        <Trash2 size={14} className="mr-1.5" /> Remove Story
+                                                    </Button>
+                                                </CardFooter>
+                                            </motion.section>
+                                        )}
+                                    </AnimatePresence>
+                                </Card>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                    {storiesData.stories && storiesData.stories.length === 0 && !loading && (
+                        <div className="text-center py-12 col-span-full">
+                            <Map size={48} className="mx-auto text-slate-400 mb-3" /> 
+                            <p className="text-slate-600 text-lg">No stories defined yet.</p>
+                            <p className="text-slate-500 text-sm">Click "Add Story" to create conversation paths.</p>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
     );
 
+    
+
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Navbar */}
-            <div className="bg-indigo-700 shadow-lg">
-                <div className="container mx-auto">
-                    <div className="flex items-center justify-between h-16 px-4">
-                        <div className="flex items-center space-x-2">
-                            <Settings className="text-indigo-200" size={24} />
-                            <span
-                                className="text-white font-bold text-xl cursor-pointer"
-                                onClick={() => handleNavigate("intents")}
-                            >
-                                Rasa Studio
-                            </span>
-                        </div>
-                        <div className="flex items-center space-x-4">
-                            <button className="text-indigo-200 hover:text-white">
-                                Documentation
-                            </button>
-                            <button className="text-indigo-200 hover:text-white">
-                                Settings
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Main content */}
+        <div className="min-h-screen bg-slate-100"> 
+            {/* Navbar and Tab container removed */}
             <div className="container mx-auto px-4 py-6">
-                {/* Tabs */}
-                <div className="flex bg-white rounded-lg shadow mb-6 overflow-hidden">
-                    <TabButton
-                        active={activeTab === "intents"}
-                        onClick={() => handleNavigate("intents")}
-                        icon={<FileText size={18} />}
-                        label="Intents"
-                    />
-                    <TabButton
-                        active={activeTab === "rules"}
-                        onClick={() => handleNavigate("rules")}
-                        icon={<Code size={18} />}
-                        label="Rules"
-                    />
-                    <TabButton
-                        active={activeTab === "stories"}
-                        onClick={() => handleNavigate("stories")}
-                        icon={<Map size={18} />}
-                        label="Stories"
-                    />
-                    <TabButton
-                        active={activeTab === "domain"}
-                        onClick={() => handleNavigate("domain")}
-                        icon={<Database size={18} />}
-                        label="Domain"
-                    />
-                    <TabButton
-                        active={activeTab === "unknown"}
-                        onClick={() => handleNavigate("unknown")}
-                        icon={<AlertCircle size={18} />}
-                        label="Unknown Queries"
-                    />
-                </div>
-
-                {/* Stories Content */}
-                <div className="bg-white shadow rounded-lg">
-                    <div className="p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h1 className="text-2xl font-bold text-gray-800">
-                                Stories Configuration
-                            </h1>
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={addStory}
-                                    className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-                                >
-                                    <Plus size={18} className="mr-2" />
-                                    Add Story
-                                </button>
-                                <button
-                                    onClick={handleSave}
-                                    disabled={loading}
-                                    className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:bg-green-400"
-                                >
-                                    <Save size={18} className="mr-2" />
-                                    {loading ? "Saving..." : "Save Changes"}
-                                </button>
-                                <button
-                                    onClick={handleTrain}
-                                    disabled={loading}
-                                    className="flex items-center px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors disabled:bg-purple-400"
-                                >
-                                    <Zap size={18} className="mr-2" />
-                                    {loading ? "Training..." : "Train Model"}
-                                </button>
-                            </div>
-                        </div>
-
-                        {loading && !storiesData.stories?.length ? (
-                            <div className="flex justify-center items-center py-12">
-                                <div className="text-indigo-600 animate-spin">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="h-8 w-8"
-                                        fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor"
-                                    >
-                                        <path
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                                        />
-                                    </svg>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-6">
-                                {storiesData.stories &&
-                                    storiesData.stories.map(
-                                        (story, storyIndex) => (
-                                            <div
-                                                key={storyIndex}
-                                                className="bg-gray-50 rounded-lg p-5 shadow-sm border border-gray-200"
-                                            >
-                                                <div className="flex justify-between items-center mb-4">
-                                                    <div className="w-2/3">
-                                                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                            Story Name
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            value={
-                                                                story.story ||
-                                                                ""
-                                                            }
-                                                            onChange={(e) =>
-                                                                handleStoryChange(
-                                                                    storyIndex,
-                                                                    "story",
-                                                                    e.target
-                                                                        .value
-                                                                )
-                                                            }
-                                                            className="w-full border border-gray-300 rounded-md px-3 py-2 shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                            placeholder="Story name"
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        onClick={() =>
-                                                            removeStory(
-                                                                storyIndex
-                                                            )
-                                                        }
-                                                        className="flex items-center px-3 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                                                    >
-                                                        <Trash2
-                                                            size={16}
-                                                            className="mr-1"
-                                                        />
-                                                        Remove
-                                                    </button>
-                                                </div>
-
-                                                <div className="mt-4">
-                                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                        Steps
-                                                    </label>
-
-                                                    <div className="space-y-3 mb-4">
-                                                        {story.steps &&
-                                                            story.steps.map(
-                                                                (
-                                                                    step,
-                                                                    stepIndex
-                                                                ) => {
-                                                                    const {
-                                                                        type,
-                                                                        value,
-                                                                    } =
-                                                                        getStepTypeAndValue(
-                                                                            step
-                                                                        );
-
-                                                                    return (
-                                                                        <div
-                                                                            key={
-                                                                                stepIndex
-                                                                            }
-                                                                            className="flex items-center space-x-2 bg-white p-3 rounded-md border border-gray-200"
-                                                                        >
-                                                                            <div className="flex-shrink-0">
-                                                                                <select
-                                                                                    value={
-                                                                                        type
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e
-                                                                                    ) =>
-                                                                                        handleStepTypeChange(
-                                                                                            storyIndex,
-                                                                                            stepIndex,
-                                                                                            e
-                                                                                                .target
-                                                                                                .value
-                                                                                        )
-                                                                                    }
-                                                                                    className="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                                                >
-                                                                                    <option value="intent">
-                                                                                        intent
-                                                                                    </option>
-                                                                                    <option value="action">
-                                                                                        action
-                                                                                    </option>
-                                                                                    <option value="slot_was_set">
-                                                                                        slot_was_set
-                                                                                    </option>
-                                                                                    <option value="active_loop">
-                                                                                        active_loop
-                                                                                    </option>
-                                                                                </select>
-                                                                            </div>
-
-                                                                            <div className="flex-grow">
-                                                                                <input
-                                                                                    type="text"
-                                                                                    value={
-                                                                                        value ||
-                                                                                        ""
-                                                                                    }
-                                                                                    onChange={(
-                                                                                        e
-                                                                                    ) =>
-                                                                                        handleStepChange(
-                                                                                            storyIndex,
-                                                                                            stepIndex,
-                                                                                            type,
-                                                                                            e
-                                                                                                .target
-                                                                                                .value
-                                                                                        )
-                                                                                    }
-                                                                                    className="w-full border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                                                                    placeholder={`${type} value`}
-                                                                                />
-                                                                            </div>
-
-                                                                            <div className="flex space-x-1">
-                                                                                <button
-                                                                                    onClick={() =>
-                                                                                        moveStep(
-                                                                                            storyIndex,
-                                                                                            stepIndex,
-                                                                                            "up"
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        stepIndex ===
-                                                                                        0
-                                                                                    }
-                                                                                    className="p-1 text-gray-500 hover:text-indigo-600 disabled:text-gray-300"
-                                                                                    title="Move up"
-                                                                                >
-                                                                                    <ArrowUp
-                                                                                        size={
-                                                                                            16
-                                                                                        }
-                                                                                    />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() =>
-                                                                                        moveStep(
-                                                                                            storyIndex,
-                                                                                            stepIndex,
-                                                                                            "down"
-                                                                                        )
-                                                                                    }
-                                                                                    disabled={
-                                                                                        stepIndex ===
-                                                                                        story
-                                                                                            .steps
-                                                                                            .length -
-                                                                                            1
-                                                                                    }
-                                                                                    className="p-1 text-gray-500 hover:text-indigo-600 disabled:text-gray-300"
-                                                                                    title="Move down"
-                                                                                >
-                                                                                    <ArrowDown
-                                                                                        size={
-                                                                                            16
-                                                                                        }
-                                                                                    />
-                                                                                </button>
-                                                                                <button
-                                                                                    onClick={() =>
-                                                                                        removeStep(
-                                                                                            storyIndex,
-                                                                                            stepIndex
-                                                                                        )
-                                                                                    }
-                                                                                    className="p-1 text-red-500 hover:text-red-700"
-                                                                                    title="Remove step"
-                                                                                >
-                                                                                    <MinusCircle
-                                                                                        size={
-                                                                                            16
-                                                                                        }
-                                                                                    />
-                                                                                </button>
-                                                                            </div>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                            )}
-                                                    </div>
-
-                                                    <button
-                                                        onClick={() =>
-                                                            addStep(storyIndex)
-                                                        }
-                                                        className="flex items-center text-sm px-3 py-1 bg-indigo-50 text-indigo-600 rounded hover:bg-indigo-100 transition-colors"
-                                                    >
-                                                        <PlusCircle
-                                                            size={14}
-                                                            className="mr-1"
-                                                        />
-                                                        Add Step
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )
-                                    )}
-
-                                {(!storiesData.stories ||
-                                    storiesData.stories.length === 0) &&
-                                    !loading && (
-                                        <div className="bg-gray-50 rounded-lg p-8 text-center border border-dashed border-gray-300">
-                                            <p className="text-gray-600">
-                                                No stories defined yet
-                                            </p>
-                                            <button
-                                                onClick={addStory}
-                                                className="mt-4 flex items-center mx-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
-                                            >
-                                                <Plus
-                                                    size={18}
-                                                    className="mr-2"
-                                                />
-                                                Add Your First Story
-                                            </button>
-                                        </div>
-                                    )}
-                            </div>
-                        )}
-                    </div>
+                <div className="bg-white shadow-lg rounded-lg border border-slate-200"> 
+                    {activeTab === "stories" ? renderStoriesContent() :
+                        <div className="p-6 text-slate-500">Content for {activeTab} will be shown here.</div>}
                 </div>
             </div>
-
-            {/* Toast notification */}
-            <ToastNotification />
+            <AnimatePresence>
+                {toast && <ToastNotification />}
+            </AnimatePresence>
         </div>
     );
 };
