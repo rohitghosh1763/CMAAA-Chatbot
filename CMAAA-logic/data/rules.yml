@@ -1,9 +1,0 @@
-version: "3.1"
-
-rules:
-    - rule: Fetch response from MongoDB for all intents
-      steps:
-          - intent: null # Match any intent
-          - action: action_fetch_response
-
- 
