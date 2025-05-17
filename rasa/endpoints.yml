@@ -1,0 +1,7 @@
+# Required endpoint configuration for Rasa
+# Save this as endpoints.yml in your project directory
+
+action_endpoint:
+    url: "http://localhost:5055/webhook" # URL for the action server
+
+# Tracker store configuration to track conversations

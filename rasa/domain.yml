@@ -1,0 +1,63 @@
+version: "3.1"
+
+intents:
+    - greet
+    - goodbye
+    - affirm
+    - deny
+    - mood_great
+    - mood_unhappy
+    - bot_challenge
+    - nlu_fallback
+
+actions:
+    - action_default_fallback
+
+responses:
+    utter_greet:
+        - text: "Hey! How are you?"
+        - text: "Hello there! How are you doing today?"
+        - text: "Hi! Nice to see you. How's your day going?"
+        - text: "Greetings! How are you feeling today?"
+
+    utter_cheer_up:
+        - text: "Here is something to cheer you up:"
+          image: "https://i.imgur.com/nGF1K8f.jpg"
+        - text: "Don't worry, things will get better:"
+          image: "https://i.imgur.com/mFSBGGJ.jpg"
+        - text: "Let me brighten your day:"
+          image: "https://i.imgur.com/xMo7Pmx.jpg"
+
+    utter_did_that_help:
+        - text: "Did that help you?"
+        - text: "Was that helpful?"
+        - text: "Did that make you feel better?"
+        - text: "Did that address your concern?"
+
+    utter_happy:
+        - text: "Great, carry on!"
+        - text: "Excellent! I'm glad to hear that."
+        - text: "Wonderful! Let me know if you need anything else."
+        - text: "That's great news!"
+
+    utter_goodbye:
+        - text: "Bye"
+        - text: "Goodbye! Have a nice day."
+        - text: "See you later!"
+        - text: "Take care! Talk to you soon."
+
+    utter_iamabot:
+        - text: "I am a bot, powered by Rasa."
+        - text: "I'm a digital assistant created with Rasa technology."
+        - text: "I'm not human - I'm a Rasa-powered bot here to help you."
+        - text: "I'm an AI assistant built using Rasa."
+
+    utter_default:
+        - text: "I'm not sure I understand. Could you rephrase?"
+        - text: "I didn't quite catch that. Can you say it differently?"
+        - text: "Sorry, I don't understand. Could you try again with different words?"
+        - text: "I'm having trouble understanding. Could you explain it another way?"
+
+session_config:
+    session_expiration_time: 60
+    carry_over_slots_to_new_session: true
