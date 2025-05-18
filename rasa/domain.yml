@@ -12,6 +12,7 @@ intents:
 
 actions:
     - action_default_fallback
+    - action_session_start
 
 responses:
     utter_greet:
