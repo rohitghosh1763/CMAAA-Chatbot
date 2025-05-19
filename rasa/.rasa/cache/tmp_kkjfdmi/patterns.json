@@ -1,0 +1,18 @@
+[
+  {
+    "name": "name",
+    "pattern": "i am [^\\s]+"
+  },
+  {
+    "name": "name",
+    "pattern": "i'm [^\\s]+"
+  },
+  {
+    "name": "name",
+    "pattern": "my name is [^\\s]+"
+  },
+  {
+    "name": "names",
+    "pattern": "(\\brohit\\b|\\bjohn\\b|\\bkavya\\b|\\balex\\b|\\bsarah\\b|\\bmike\\b|\\bjennifer\\b|\\bdavid\\b|\\bemma\\b|\\bjames\\b|\\blisa\\b|\\brobert\\b|\\bsophia\\b|\\bdaniel\\b|\\btaylor\\b|\\bjamie\\b|\\bchris\\b|\\bmaria\\b)"
+  }
+]

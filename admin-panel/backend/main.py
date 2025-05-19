@@ -33,7 +33,7 @@ try:
     SCRIPT_DIR = Path(__file__).resolve().parent
     # Corrected: .parent.parent takes us to D:\Coding\CMAAA-Chatbot
     RASA_PROJECT_BASE = SCRIPT_DIR.parent.parent
-    RASA_ROOT = RASA_PROJECT_BASE / "logic" # This should now be D:\Coding\CMAAA-Chatbot\logic
+    RASA_ROOT = RASA_PROJECT_BASE / "rasa" # This should now be D:\Coding\CMAAA-Chatbot\logic
 
 except NameError:
     # Fallback for environments where __file__ is not defined
@@ -66,7 +66,7 @@ DOMAIN_PATH = RASA_ROOT / "domain.yml" # domain.yml is directly in the 'logic' f
 # Log resolved paths at startup for easier debugging
 logger.info(f"Script directory: {SCRIPT_DIR if '__file__' in locals() or '__file__' in globals() else 'N/A (__file__ not defined)'}")
 logger.info(f"RASA_PROJECT_BASE (intended D:\\Coding\\CMAAA-Chatbot) resolved to: {RASA_PROJECT_BASE if 'RASA_PROJECT_BASE' in locals() else 'N/A (likely due to __file__ issue)'}")
-logger.info(f"RASA_ROOT (intended D:\\Coding\\CMAAA-Chatbot\\logic) resolved to: {RASA_ROOT}")
+logger.info(f"RASA_ROOT (intended D:\\Coding\\CMAAA-Chatbot\\rasa) resolved to: {RASA_ROOT}")
 logger.info(f"Data directory targeted at: {DATA_DIR}")
 logger.info(f"NLU file targeted at: {NLU_PATH}")
 logger.info(f"Rules file targeted at: {RULES_PATH}")

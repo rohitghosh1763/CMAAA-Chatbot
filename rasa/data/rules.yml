@@ -12,6 +12,11 @@ rules:
           - intent: goodbye
           - action: utter_goodbye
 
+    - rule: Welcome the user on session start
+      steps:
+          - intent: welcome_user
+          - action: utter_welcome
+
     - rule: Handle low NLU confidence
       steps:
           - intent: nlu_fallback

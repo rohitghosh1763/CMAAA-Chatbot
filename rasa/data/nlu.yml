@@ -103,3 +103,14 @@ nlu:
           - hfdjkshfkjs
           - random sequence
           - abcdefg
+          - 8lcvbyi
+    - intent: welcome_user
+      examples: |-
+          - welcome
+          - welcome to the chatbot
+          - welcome to our service
+          - glad to see you here
+          - welcome aboard
+          - welcome to the platform
+          - nice to have you here
+          - thanks for joining

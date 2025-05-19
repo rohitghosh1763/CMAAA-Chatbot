@@ -8,11 +8,18 @@ intents:
     - mood_great
     - mood_unhappy
     - bot_challenge
+    - welcome_user
     - nlu_fallback
 
 actions:
     - action_default_fallback
-    - action_session_start
+    # - utter_greet
+    # - utter_cheer_up
+    # - utter_did_that_help
+    # - utter_happy
+    # - utter_goodbye
+    # - utter_iamabot
+    # - utter_default
 
 responses:
     utter_greet:
@@ -23,11 +30,11 @@ responses:
 
     utter_cheer_up:
         - text: "Here is something to cheer you up:"
-          image: "https://i.imgur.com/nGF1K8f.jpg"
+          image: "https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
         - text: "Don't worry, things will get better:"
-          image: "https://i.imgur.com/mFSBGGJ.jpg"
+          image: "https://plus.unsplash.com/premium_photo-1722859221349-26353eae4744?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
         - text: "Let me brighten your day:"
-          image: "https://i.imgur.com/xMo7Pmx.jpg"
+          image: "https://plus.unsplash.com/premium_photo-1694819488591-a43907d1c5cc?q=80&w=2028&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 
     utter_did_that_help:
         - text: "Did that help you?"
@@ -52,6 +59,12 @@ responses:
         - text: "I'm a digital assistant created with Rasa technology."
         - text: "I'm not human - I'm a Rasa-powered bot here to help you."
         - text: "I'm an AI assistant built using Rasa."
+
+    utter_welcome:
+        - text: "Hello, Wow may i help you today"
+        - text: "Welcome! What can I do for you?"
+        - text: "Thanks for reaching out. How can I assist you?"
+        - text: "Welcome to our service. How can I help you today?"
 
     utter_default:
         - text: "I'm not sure I understand. Could you rephrase?"
