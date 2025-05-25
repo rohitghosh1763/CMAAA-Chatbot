@@ -11,6 +11,7 @@ import Rules from "./components/Rules";
 import Stories from "./components/Stories";
 import Domain from "./components/Domain";
 import UnknownQueries from "./components/UnknownQueries";
+import Models from "./components/Models";
 import "./App.css";
 
 const App = () => {
@@ -26,6 +27,7 @@ const App = () => {
                 <Route path="/stories" element={<Stories />} />
                 <Route path="/domain" element={<Domain />} />
                 <Route path="/unknown" element={<UnknownQueries />} />
+                <Route path="/models" element={<Models />} />
                 {/* Fallback route */}
                 <Route path="*" element={<Navigate to="/intents" replace />} />
             </Routes>

@@ -34,6 +34,7 @@ const Navbar = () => {
                     <TabButton active={activeTab === "stories"} onClick={() => handleNavigate("stories")} icon={<Map size={18} />} label="Stories" />
                     <TabButton active={activeTab === "domain"} onClick={() => handleNavigate("domain")} icon={<Database size={18} />} label="Domain" />
                     <TabButton active={activeTab === "unknown"} onClick={() => handleNavigate("unknown")} icon={<AlertCircle size={18} />} label="Unknown Queries" />
+                    <TabButton active={activeTab === "Models"} onClick={() => handleNavigate("models")} icon={<AlertCircle size={18} />} label="Models" />
                 </div>
             </div>
         </>
