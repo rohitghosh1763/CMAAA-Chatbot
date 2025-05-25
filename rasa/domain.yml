@@ -1,77 +1,62 @@
-version: "3.1"
-
+---
+version: '3.1'
 intents:
-    - greet
-    - goodbye
-    - affirm
-    - deny
-    - mood_great
-    - mood_unhappy
-    - bot_challenge
-    - welcome_user
-    - nlu_fallback
-
-actions:
-    - action_default_fallback
-    # - utter_greet
-    # - utter_cheer_up
-    # - utter_did_that_help
-    # - utter_happy
-    # - utter_goodbye
-    # - utter_iamabot
-    # - utter_default
-
+  - greet
+  - goodbye
+  - affirm
+  - deny
+  - mood_great
+  - mood_unhappy
+  - bot_challenge
+  - nlu_fallback
+entities: []
+slots: {}
 responses:
-    utter_greet:
-        - text: "Hey! How are you?"
-        - text: "Hello there! How are you doing today?"
-        - text: "Hi! Nice to see you. How's your day going?"
-        - text: "Greetings! How are you feeling today?"
-
-    utter_cheer_up:
-        - text: "Here is something to cheer you up:"
-          image: "https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-        - text: "Don't worry, things will get better:"
-          image: "https://plus.unsplash.com/premium_photo-1722859221349-26353eae4744?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-        - text: "Let me brighten your day:"
-          image: "https://plus.unsplash.com/premium_photo-1694819488591-a43907d1c5cc?q=80&w=2028&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-
-    utter_did_that_help:
-        - text: "Did that help you?"
-        - text: "Was that helpful?"
-        - text: "Did that make you feel better?"
-        - text: "Did that address your concern?"
-
-    utter_happy:
-        - text: "Great, carry on!"
-        - text: "Excellent! I'm glad to hear that."
-        - text: "Wonderful! Let me know if you need anything else."
-        - text: "That's great news!"
-
-    utter_goodbye:
-        - text: "Bye"
-        - text: "Goodbye! Have a nice day."
-        - text: "See you later!"
-        - text: "Take care! Talk to you soon."
-
-    utter_iamabot:
-        - text: "I am a bot, powered by Rasa."
-        - text: "I'm a digital assistant created with Rasa technology."
-        - text: "I'm not human - I'm a Rasa-powered bot here to help you."
-        - text: "I'm an AI assistant built using Rasa."
-
-    utter_welcome:
-        - text: "Hello, Wow may i help you today"
-        - text: "Welcome! What can I do for you?"
-        - text: "Thanks for reaching out. How can I assist you?"
-        - text: "Welcome to our service. How can I help you today?"
-
-    utter_default:
-        - text: "I'm not sure I understand. Could you rephrase?"
-        - text: "I didn't quite catch that. Can you say it differently?"
-        - text: "Sorry, I don't understand. Could you try again with different words?"
-        - text: "I'm having trouble understanding. Could you explain it another way?"
-
+  utter_greet:
+    - text: Hey! How are you?
+    - text: Hello there! How are you doing today?
+    - text: Hi! Nice to see you. How's your day going?
+    - text: Greetings! How are you feeling today?
+  utter_cheer_up:
+    - text: 'Here is something to cheer you up:'
+      image: https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?q=80&w=1976&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
+    - text: "Don't worry, things will get better:"
+      image: https://plus.unsplash.com/premium_photo-1722859221349-26353eae4744?q=80&w=1936&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
+    - text: 'Let me brighten your day:'
+      image: https://plus.unsplash.com/premium_photo-1694819488591-a43907d1c5cc?q=80&w=2028&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
+  utter_did_that_help:
+    - text: Did that help you?
+    - text: Was that helpful?
+    - text: Did that make you feel better?
+    - text: Did that address your concern?
+  utter_happy:
+    - text: Great, carry on!
+    - text: Excellent! I'm glad to hear that.
+    - text: Wonderful! Let me know if you need anything else.
+    - text: That's great news!
+  utter_goodbye:
+    - text: Bye
+    - text: Goodbye! Have a nice day.
+    - text: See you later!
+    - text: Take care! Talk to you soon.
+  utter_iamabot:
+    - text: I am a bot, powered by Rasa.
+    - text: I'm a digital assistant created with Rasa technology.
+    - text: I'm not human - I'm a Rasa-powered bot here to help you.
+    - text: I'm an AI assistant built using Rasa.
+  utter_welcome:
+    - text: Hello, Wow may i help you today
+    - text: Welcome! What can I do for you?
+    - text: Thanks for reaching out. How can I assist you?
+    - text: Welcome to our service. How can I help you today?
+  utter_default:
+    - text: I'm not sure I understand. Could you rephrase?
+    - text: I didn't quite catch that. Can you say it differently?
+    - text: Sorry, I don't understand. Could you try again with different words?
+    - text: I'm having trouble understanding. Could you explain it another way?
+actions:
+  - action_default_fallback
+forms: {}
 session_config:
-    session_expiration_time: 60
-    carry_over_slots_to_new_session: true
+  session_expiration_time: 60
+  carry_over_slots_to_new_session: true

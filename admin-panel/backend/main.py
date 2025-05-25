@@ -1,13 +1,17 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 import subprocess
 from pathlib import Path
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import LiteralScalarString
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import re
 import logging
-import os # Added for environment variable fallback
+import os
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from bson import ObjectId
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +27,15 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
+
+# --- MongoDB Configuration ---
+MONGODB_URL = os.environ.get("MONGODB_URL", "mongodb://localhost:27017")
+DB_NAME = "cmaaa"
+UNKNOWN_QUERIES_COLLECTION = "unknown-queries"
+
+# Database connection
+mongo_client = None
+db = None
 
 # --- Path Definitions ---
 # main.py is in D:\Coding\CMAAA-Chatbot\interface\backend\main.py
@@ -77,6 +90,67 @@ logger.info(f"Domain file targeted at: {DOMAIN_PATH}")
 class YAMLContent(BaseModel):
     content: dict  # Expecting a dictionary structure from the frontend
 
+# --- MongoDB Models ---
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid ObjectId")
+        return ObjectId(v)
+
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        field_schema.update(type="string")
+
+class UnknownQueryBase(BaseModel):
+    query: str
+    timestamp: datetime = Field(default_factory=datetime.now)
+    intent_ranking: List[Dict[str, Any]] = []
+
+class UnknownQueryDB(UnknownQueryBase):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class UnknownQueryCreate(UnknownQueryBase):
+    pass
+
+class UnknownQueryResponse(UnknownQueryBase):
+    id: str
+
+    class Config:
+        allow_population_by_field_name = True
+
+# --- MongoDB Connection Management ---
+async def get_database() -> AsyncIOMotorDatabase:
+    global mongo_client, db
+    if not mongo_client:
+        try:
+            mongo_client = AsyncIOMotorClient(MONGODB_URL)
+            db = mongo_client[DB_NAME]
+            logger.info(f"Connected to MongoDB at {MONGODB_URL}, database: {DB_NAME}")
+        except Exception as e:
+            logger.error(f"Failed to connect to MongoDB: {e}")
+            raise HTTPException(status_code=500, detail=f"Database connection error: {str(e)}")
+    return db
+
+@app.on_event("startup")
+async def startup_db_client():
+    await get_database()
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    global mongo_client
+    if mongo_client:
+        mongo_client.close()
+        logger.info("MongoDB connection closed")
 
 # --- Helper function to ensure data directory exists ---
 def ensure_data_directory():
@@ -95,6 +169,131 @@ def ensure_data_directory():
 @app.get("/")
 async def root():
     return {"message": "Admin panel API is running!"}
+
+# --- Unknown Queries Endpoints ---
+@app.post("/unknown-queries", response_model=UnknownQueryResponse)
+async def create_unknown_query(query: UnknownQueryCreate, db: AsyncIOMotorDatabase = Depends(get_database)):
+    """Create a new entry for an unknown query."""
+    try:
+        collection = db[UNKNOWN_QUERIES_COLLECTION]
+        query_dict = query.dict()
+        result = await collection.insert_one(query_dict)
+        
+        # Get the created document to return
+        created_query = await collection.find_one({"_id": result.inserted_id})
+        if created_query:
+            created_query["id"] = str(created_query["_id"])
+            return created_query
+        
+        raise HTTPException(status_code=500, detail="Failed to create unknown query record")
+    except Exception as e:
+        logger.error(f"Error creating unknown query record: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.get("/unknown-queries", response_model=List[UnknownQueryResponse])
+async def get_unknown_queries(
+    skip: int = 0, 
+    limit: int = 100,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Retrieve a list of unknown queries with pagination."""
+    try:
+        collection = db[UNKNOWN_QUERIES_COLLECTION]
+        queries = []
+        
+        cursor = collection.find().skip(skip).limit(limit).sort("timestamp", -1)
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            queries.append(doc)
+        
+        return queries
+    except Exception as e:
+        logger.error(f"Error retrieving unknown queries: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.get("/unknown-queries/{query_id}", response_model=UnknownQueryResponse)
+async def get_unknown_query(
+    query_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Retrieve a specific unknown query by ID."""
+    try:
+        collection = db[UNKNOWN_QUERIES_COLLECTION]
+        if not ObjectId.is_valid(query_id):
+            raise HTTPException(status_code=400, detail=f"Invalid query ID format: {query_id}")
+            
+        query = await collection.find_one({"_id": ObjectId(query_id)})
+        if not query:
+            raise HTTPException(status_code=404, detail=f"Unknown query with ID {query_id} not found")
+            
+        query["id"] = str(query["_id"])
+        return query
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving unknown query {query_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.delete("/unknown-queries/{query_id}")
+async def delete_unknown_query(
+    query_id: str,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Delete a specific unknown query by ID."""
+    try:
+        collection = db[UNKNOWN_QUERIES_COLLECTION]
+        if not ObjectId.is_valid(query_id):
+            raise HTTPException(status_code=400, detail=f"Invalid query ID format: {query_id}")
+            
+        result = await collection.delete_one({"_id": ObjectId(query_id)})
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail=f"Unknown query with ID {query_id} not found")
+            
+        return {"success": True, "message": f"Unknown query with ID {query_id} deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting unknown query {query_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+@app.get("/unknown-queries/search/", response_model=List[UnknownQueryResponse])
+async def search_unknown_queries(
+    query_text: str = Query(None, description="Search for queries containing this text"),
+    date_from: Optional[datetime] = Query(None, description="Filter queries from this date"),
+    date_to: Optional[datetime] = Query(None, description="Filter queries to this date"),
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncIOMotorDatabase = Depends(get_database)
+):
+    """Search for unknown queries with various filters."""
+    try:
+        collection = db[UNKNOWN_QUERIES_COLLECTION]
+        filter_query = {}
+        
+        # Build the filter based on parameters
+        if query_text:
+            filter_query["query"] = {"$regex": query_text, "$options": "i"}
+            
+        date_filter = {}
+        if date_from:
+            date_filter["$gte"] = date_from
+        if date_to:
+            date_filter["$lte"] = date_to
+        if date_filter:
+            filter_query["timestamp"] = date_filter
+            
+        # Execute the query
+        queries = []
+        cursor = collection.find(filter_query).skip(skip).limit(limit).sort("timestamp", -1)
+        
+        async for doc in cursor:
+            doc["id"] = str(doc["_id"])
+            queries.append(doc)
+            
+        return queries
+    except Exception as e:
+        logger.error(f"Error searching unknown queries: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 # --- NLU Endpoints ---
 @app.get("/nlu")
@@ -430,8 +629,4 @@ def rasa_shell_command():
 if __name__ == "__main__":
     import uvicorn
     logger.info(f"Starting Uvicorn server for main:app. Effective RASA_ROOT is {RASA_ROOT}")
-    # To run this:
-    # 1. Navigate to D:\Coding\CMAAA-Chatbot\interface\backend in your terminal
-    # 2. Run: uvicorn main:app --reload
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
+   
