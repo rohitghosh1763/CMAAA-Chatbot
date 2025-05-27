@@ -268,9 +268,9 @@ const Stories = () => {
                     <Button onClick={handleSave} variant="outline" className="border-green-600 text-green-600 hover:bg-green-50 hover:text-green-700" disabled={loading || !storiesData.stories || storiesData.stories.length === 0}>
                         <Save size={18} className="mr-2" /> {loading ? "Saving..." : "Save"}
                     </Button>
-                    <Button onClick={handleTrain} className="bg-purple-600 hover:bg-purple-700" disabled={loading || !storiesData.stories || storiesData.stories.length === 0}>
-                        <Zap size={18} className="mr-2" /> {loading ? "Training..." : "Train"}
-                    </Button>
+                        <Button onClick={handleTrain} className="bg-purple-600 hover:bg-purple-700" disabled={loading || !storiesData.stories || storiesData.stories.length === 0}>
+                            <Zap size={18} className="mr-2" /> {loading ? "Training..." : "Train"}
+                        </Button>
                 </div>
             </div>
 

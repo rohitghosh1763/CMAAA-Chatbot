@@ -28,6 +28,7 @@ nlu:
       - kaise ho
       - hello everyone
       - ram ram amlan
+      - gibberish
   - intent: goodbye
     examples: |
       - cu

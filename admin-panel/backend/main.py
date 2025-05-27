@@ -68,10 +68,17 @@ STORIES_PATH = DATA_DIR / "stories.yml"
 DOMAIN_PATH = RASA_ROOT / "domain.yml"
 ACTIVE_MODEL_FILENAME = "active_model.tar.gz"
 
-RASA_LOGS_DIR = RASA_ROOT / "logs"
+RASA_LOGS_DIR = RASA_ROOT / "logs" # General logs directory
+
+# Rasa API Server constants
 RASA_API_PID_FILE = RASA_LOGS_DIR / ".rasa_api.pid"
 RASA_API_LOG_FILE = RASA_LOGS_DIR / "rasa_api.log"
 RASA_API_PORT = 5005
+
+# Rasa Actions Server constants
+RASA_ACTIONS_PID_FILE = RASA_LOGS_DIR / ".rasa_actions.pid"
+RASA_ACTIONS_LOG_FILE = RASA_LOGS_DIR / "rasa_actions.log"
+RASA_ACTIONS_PORT = 5055 # Default Rasa actions port
 
 # --- Pydantic Models ---
 class YAMLContent(BaseModel):
@@ -109,10 +116,10 @@ class ModelInfo(BaseModel):
     is_active: bool
 
 class RasaStatusResponse(BaseModel):
-    status: str
+    status: str # e.g., "running", "stopped", "error"
     message: Optional[str] = None
     pid: Optional[int] = None
-    model_name: Optional[str] = None
+    model_name: Optional[str] = None # Specific to Rasa API server
     port: Optional[int] = None
     log_file: Optional[str] = None
 
@@ -167,7 +174,7 @@ async def startup_event_handler():
     ensure_directory(RASA_ROOT, "Rasa Project Root")
     ensure_directory(DATA_DIR, "Rasa Data")
     ensure_directory(MODELS_DIR, "Rasa Models")
-    ensure_directory(RASA_LOGS_DIR, "Rasa Logs")
+    ensure_directory(RASA_LOGS_DIR, "Rasa Logs") # Ensures general logs dir for API and Actions
     await get_database()
 
 @app.on_event("shutdown")
@@ -179,7 +186,7 @@ async def shutdown_event_handler():
     logger.info("FastAPI application shutdown.")
 
 # --- Root Endpoint ---
-@app.get("/", summary="Root endpoint to check API status", include_in_schema=False) # Hide from OpenAPI docs if it's just a health check
+@app.get("/", summary="Root endpoint to check API status", include_in_schema=False)
 async def root():
     return {"message": "Rasa Admin Panel API is running!"}
 
@@ -193,7 +200,6 @@ async def create_unknown_query(query: UnknownQueryCreate, db_conn: AsyncIOMotorD
         created_query_doc = await collection.find_one({"_id": result.inserted_id})
         if created_query_doc:
             return UnknownQueryResponse(id=str(created_query_doc["_id"]), **created_query_doc)
-        # This case should ideally not be reached if insert_one succeeds and find_one uses the same ID.
         logger.error(f"Failed to retrieve unknown query record after insertion with ID: {result.inserted_id}")
         raise HTTPException(status_code=500, detail="Failed to create or retrieve unknown query record after insertion.")
     except Exception as e:
@@ -208,14 +214,12 @@ async def get_unknown_queries(skip: int = Query(0, ge=0), limit: int = Query(100
         results = []
         async for doc in queries_cursor:
             try:
-                # Defensive check, though _id should always exist for MongoDB documents
                 if "_id" not in doc:
                     logger.warning(f"Document missing '_id' in get_unknown_queries, skipping: {doc.get('query', 'N/A')}")
                     continue
                 results.append(UnknownQueryResponse(id=str(doc["_id"]), **doc))
-            except Exception as e_doc: # Catch errors during processing of a single document
+            except Exception as e_doc:
                 logger.error(f"Error processing document {doc.get('_id', 'UNKNOWN_ID')} in get_unknown_queries: {e_doc}", exc_info=True)
-                # Skip problematic document, consider if partial results are acceptable
                 continue
         return results
     except Exception as e:
@@ -225,8 +229,8 @@ async def get_unknown_queries(skip: int = Query(0, ge=0), limit: int = Query(100
 @app.get("/unknown-queries/search/", response_model=List[UnknownQueryResponse], summary="Search unknown queries")
 async def search_unknown_queries(
     query_text: Optional[str] = Query(None, description="Search for queries containing this text (case-insensitive substring match)"),
-    date_from: Optional[datetime] = Query(None, description="Filter queries from this date (ISO format, e.g., قومي-MM-DDTHH:MM:SS)"),
-    date_to: Optional[datetime] = Query(None, description="Filter queries to this date (ISO format, e.g., قومي-MM-DDTHH:MM:SS)"),
+    date_from: Optional[datetime] = Query(None, description="Filter queries from this date (ISO format, e.g., YYYY-MM-DDTHH:MM:SS)"),
+    date_to: Optional[datetime] = Query(None, description="Filter queries to this date (ISO format, e.g., YYYY-MM-DDTHH:MM:SS)"),
     skip: int = Query(0, ge=0, description="Number of records to skip for pagination"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
     db_conn: AsyncIOMotorDatabase = Depends(get_database)
@@ -234,43 +238,31 @@ async def search_unknown_queries(
     try:
         collection = db_conn[UNKNOWN_QUERIES_COLLECTION]
         filter_conditions: Dict[str, Any] = {}
-
-        if query_text:
-            filter_conditions["query"] = {"$regex": query_text, "$options": "i"}
-
+        if query_text: filter_conditions["query"] = {"$regex": query_text, "$options": "i"}
         date_filter: Dict[str, datetime] = {}
-        if date_from:
-            date_filter["$gte"] = date_from
-        if date_to:
-            date_filter["$lte"] = date_to
-
-        if date_filter:
-            filter_conditions["timestamp"] = date_filter
+        if date_from: date_filter["$gte"] = date_from
+        if date_to: date_filter["$lte"] = date_to
+        if date_filter: filter_conditions["timestamp"] = date_filter
 
         logger.info(f"Searching unknown queries with filter: {filter_conditions}, skip: {skip}, limit: {limit}")
         queries_cursor = collection.find(filter_conditions).skip(skip).limit(limit).sort("timestamp", -1)
-
         results = []
         async for doc in queries_cursor:
             try:
                 if "_id" not in doc:
                     logger.warning(f"Document missing '_id' in search, skipping: {doc.get('query', 'N/A')}")
                     continue
-                # Ensure defaults for potentially missing fields in older docs before Pydantic validation
-                doc.setdefault('query', 'Unknown Query Text') # Should match Pydantic model's expectations
-                doc.setdefault('timestamp', datetime.now())   # Or handle as truly optional in model
-                doc.setdefault('intent_ranking', [])          # Already has default_factory in model
-
+                doc.setdefault('query', 'Unknown Query Text')
+                doc.setdefault('timestamp', datetime.now())
+                doc.setdefault('intent_ranking', [])
                 results.append(UnknownQueryResponse(id=str(doc["_id"]), **doc))
             except Exception as e_doc:
                 logger.error(f"Error processing document {doc.get('_id', 'UNKNOWN_ID')} in search: {e_doc}", exc_info=True)
-                continue # Skip problematic document
+                continue
         return results
-    except Exception as e: # General catch-all for the endpoint
+    except Exception as e:
         logger.error(f"Error in search_unknown_queries endpoint: {e}", exc_info=True)
-        # Provide a generic error message to the client for 500s
         raise HTTPException(status_code=500, detail="An error occurred while searching unknown queries. Please check server logs.")
-
 
 @app.get("/unknown-queries/{query_id}", response_model=UnknownQueryResponse, summary="Get a specific unknown query by ID")
 async def get_unknown_query_by_id(query_id: str, db_conn: AsyncIOMotorDatabase = Depends(get_database)):
@@ -282,9 +274,8 @@ async def get_unknown_query_by_id(query_id: str, db_conn: AsyncIOMotorDatabase =
         if not query_doc:
             raise HTTPException(status_code=404, detail=f"Unknown query with ID {query_id} not found")
         return UnknownQueryResponse(id=str(query_doc["_id"]), **query_doc)
-    except HTTPException: # Re-raise HTTPExceptions directly
-        raise
-    except Exception as e: # Catch other exceptions
+    except HTTPException: raise
+    except Exception as e:
         logger.error(f"Error retrieving unknown query {query_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error retrieving query {query_id}: {str(e)}")
 
@@ -297,9 +288,7 @@ async def delete_unknown_query_by_id(query_id: str, db_conn: AsyncIOMotorDatabas
         result = await collection.delete_one({"_id": ObjectId(query_id)})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail=f"Unknown query with ID {query_id} not found for deletion.")
-        # No content (None) is returned by FastAPI for 204
-    except HTTPException:
-        raise
+    except HTTPException: raise
     except Exception as e:
         logger.error(f"Error deleting unknown query {query_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error deleting query {query_id}: {str(e)}")
@@ -311,15 +300,10 @@ async def list_rasa_models():
     models_info = []
     active_model_source_file = MODELS_DIR / ".active_model_source"
     current_active_original_model_name = None
-
     if active_model_source_file.exists():
-        try:
-            current_active_original_model_name = active_model_source_file.read_text().strip()
-        except Exception as e:
-            logger.error(f"Error reading active model source file: {e}", exc_info=True)
-
+        try: current_active_original_model_name = active_model_source_file.read_text().strip()
+        except Exception as e: logger.error(f"Error reading active model source file: {e}", exc_info=True)
     model_files = [p for p in MODELS_DIR.glob("*.tar.gz") if p.name != ACTIVE_MODEL_FILENAME]
-
     for model_file_path in model_files:
         try:
             models_info.append(ModelInfo(
@@ -328,8 +312,7 @@ async def list_rasa_models():
                 size_mb=round(model_file_path.stat().st_size / (1024 * 1024), 2),
                 is_active=(model_file_path.name == current_active_original_model_name)
             ))
-        except Exception as e: # Catch error if a specific model file has issues (e.g., stat fails)
-            logger.error(f"Error processing model file {model_file_path.name}: {e}", exc_info=True)
+        except Exception as e: logger.error(f"Error processing model file {model_file_path.name}: {e}", exc_info=True)
     models_info.sort(key=lambda m: m.created_at, reverse=True)
     return models_info
 
@@ -339,12 +322,10 @@ async def activate_rasa_model(model_name: str):
     original_model_path = MODELS_DIR / model_name
     active_model_target_path = MODELS_DIR / ACTIVE_MODEL_FILENAME
     active_model_source_file = MODELS_DIR / ".active_model_source"
-
     if not original_model_path.exists() or not original_model_path.is_file():
         raise HTTPException(status_code=404, detail=f"Model file '{model_name}' not found in {MODELS_DIR}.")
     if model_name == ACTIVE_MODEL_FILENAME:
         raise HTTPException(status_code=400, detail=f"Cannot activate '{ACTIVE_MODEL_FILENAME}' onto itself.")
-
     try:
         if active_model_target_path.exists(): active_model_target_path.unlink(missing_ok=True)
         shutil.copy(str(original_model_path), str(active_model_target_path))
@@ -361,23 +342,17 @@ async def delete_rasa_model(model_name: str):
     model_to_delete_path = MODELS_DIR / model_name
     active_model_target_path = MODELS_DIR / ACTIVE_MODEL_FILENAME
     active_model_source_file = MODELS_DIR / ".active_model_source"
-
     if model_name == ACTIVE_MODEL_FILENAME:
         raise HTTPException(status_code=400, detail=f"Cannot delete '{ACTIVE_MODEL_FILENAME}' directly.")
     if not model_to_delete_path.exists():
         raise HTTPException(status_code=404, detail=f"Model file '{model_name}' not found.")
-
     try:
         is_currently_active_source = False
         if active_model_source_file.exists():
             try:
-                if active_model_source_file.read_text().strip() == model_name:
-                    is_currently_active_source = True
-            except Exception as e:
-                logger.error(f"Error reading active model source file during delete: {e}", exc_info=True)
-
-
-        model_to_delete_path.unlink() # missing_ok=False by default, will raise if not found, but we check above
+                if active_model_source_file.read_text().strip() == model_name: is_currently_active_source = True
+            except Exception as e: logger.error(f"Error reading active model source file during delete: {e}", exc_info=True)
+        model_to_delete_path.unlink()
         message = f"Model '{model_name}' deleted."
         if is_currently_active_source:
             if active_model_target_path.exists(): active_model_target_path.unlink(missing_ok=True)
@@ -394,19 +369,11 @@ def _get_running_rasa_pid_from_file() -> Optional[int]:
     if not RASA_API_PID_FILE.exists(): return None
     try:
         pid_str = RASA_API_PID_FILE.read_text().strip()
-        if not pid_str:
-            RASA_API_PID_FILE.unlink(missing_ok=True)
-            return None
+        if not pid_str: RASA_API_PID_FILE.unlink(missing_ok=True); return None
         pid = int(pid_str)
-        if psutil.pid_exists(pid):
-            # Optional: Add a more robust check if the process is indeed Rasa
-            # p = psutil.Process(pid)
-            # if "rasa" in " ".join(p.cmdline()).lower(): return pid
-            return pid # Basic check
-        else:
-            RASA_API_PID_FILE.unlink(missing_ok=True) # Stale PID file
-            return None
-    except (ValueError, FileNotFoundError, psutil.Error) as e: # psutil.Error covers various psutil issues
+        if psutil.pid_exists(pid): return pid
+        else: RASA_API_PID_FILE.unlink(missing_ok=True); return None
+    except (ValueError, FileNotFoundError, psutil.Error) as e:
         logger.warning(f"Error processing PID file '{RASA_API_PID_FILE}': {e}. Cleaning up.")
         RASA_API_PID_FILE.unlink(missing_ok=True)
         return None
@@ -415,81 +382,202 @@ def _get_running_rasa_pid_from_file() -> Optional[int]:
 async def start_rasa_api_service_endpoint():
     if _get_running_rasa_pid_from_file():
         raise HTTPException(status_code=400, detail="Rasa API service appears to be already running.")
-
     active_model_path = MODELS_DIR / ACTIVE_MODEL_FILENAME
     active_model_source_file = MODELS_DIR / ".active_model_source"
     if not active_model_path.exists():
         raise HTTPException(status_code=400, detail=f"Active model '{ACTIVE_MODEL_FILENAME}' not found. Activate a model first.")
-
     current_active_original_model_name = "Unknown (no source file)"
     if active_model_source_file.exists():
-        try:
-            current_active_original_model_name = active_model_source_file.read_text().strip()
-        except Exception as e:
-            logger.error(f"Error reading active model source file for Rasa start: {e}", exc_info=True)
-
-
-    # Ensure the model path for Rasa command is relative to RASA_ROOT
-    try:
-        model_path_for_rasa_cmd = active_model_path.relative_to(RASA_ROOT)
-    except ValueError: # If MODELS_DIR is not under RASA_ROOT for some reason
-        logger.error(f"Cannot make model path {active_model_path} relative to RASA_ROOT {RASA_ROOT}. Using full path.")
-        model_path_for_rasa_cmd = active_model_path # Fallback, though Rasa prefers relative from project root
-
+        try: current_active_original_model_name = active_model_source_file.read_text().strip()
+        except Exception as e: logger.error(f"Error reading active model source file for Rasa start: {e}", exc_info=True)
+    try: model_path_for_rasa_cmd = active_model_path.relative_to(RASA_ROOT)
+    except ValueError: model_path_for_rasa_cmd = active_model_path; logger.error(f"Cannot make model path {active_model_path} relative to RASA_ROOT {RASA_ROOT}. Using full path.")
     rasa_command = ["rasa", "run", "--enable-api", "--cors", "*", "-m", str(model_path_for_rasa_cmd), "--port", str(RASA_API_PORT)]
     logger.info(f"Attempting to start Rasa API. CWD: '{RASA_ROOT}', Cmd: '{' '.join(rasa_command)}'")
-
     try:
         ensure_directory(RASA_LOGS_DIR, "Rasa Logs")
-        # Using CREATE_NO_WINDOW on Windows to prevent console window pop-up for Popen
-        creationflags = 0
-        if os.name == 'nt':
-            creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-
-        with open(RASA_API_LOG_FILE, 'ab') as log_f: # Append binary mode
+        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+        with open(RASA_API_LOG_FILE, 'ab') as log_f:
             process = subprocess.Popen(rasa_command, cwd=str(RASA_ROOT), stdout=log_f, stderr=log_f, creationflags=creationflags)
         RASA_API_PID_FILE.write_text(str(process.pid))
         logger.info(f"Rasa API process started (PID: {process.pid}). Logging to '{RASA_API_LOG_FILE}'.")
-        await asyncio.sleep(7) # Allow time for startup or quick failure
-
-        if psutil.pid_exists(process.pid):
-            p_status = psutil.Process(process.pid).status()
-            if p_status not in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
-                log_file_rel_path = str(RASA_API_LOG_FILE.relative_to(RASA_PROJECT_BASE)) if RASA_API_LOG_FILE.is_relative_to(RASA_PROJECT_BASE) else str(RASA_API_LOG_FILE)
-                return RasaStatusResponse(
-                    status="running", pid=process.pid, model_name=current_active_original_model_name, port=RASA_API_PORT,
-                    log_file=log_file_rel_path,
-                    message=f"Rasa API started with model '{current_active_original_model_name}'.")
-        # If process doesn't exist or is zombie/dead
-        RASA_API_PID_FILE.unlink(missing_ok=True)
+        await asyncio.sleep(7)
         log_file_rel_path = str(RASA_API_LOG_FILE.relative_to(RASA_PROJECT_BASE)) if RASA_API_LOG_FILE.is_relative_to(RASA_PROJECT_BASE) else str(RASA_API_LOG_FILE)
-        detail_msg = f"Rasa process (PID: {process.pid if 'process' in locals() else 'N/A'}) did not stay alive or became zombie/dead. Check logs at '{log_file_rel_path}'."
+        if psutil.pid_exists(process.pid) and psutil.Process(process.pid).status() not in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
+            return RasaStatusResponse(status="running", pid=process.pid, model_name=current_active_original_model_name, port=RASA_API_PORT, log_file=log_file_rel_path, message=f"Rasa API started with model '{current_active_original_model_name}'.")
+        RASA_API_PID_FILE.unlink(missing_ok=True)
+        detail_msg = f"Rasa process (PID: {process.pid if 'process' in locals() else 'N/A'}) did not stay alive. Check logs at '{log_file_rel_path}'."
         logger.error(detail_msg)
         raise HTTPException(status_code=500, detail=detail_msg)
-    except FileNotFoundError: # For 'rasa' command
-        logger.error("Rasa command not found. Is Rasa installed and in PATH?", exc_info=True)
+    except FileNotFoundError: 
+        logger.error("Rasa command not found.", exc_info=True)
         raise HTTPException(status_code=500, detail="Rasa command not found. Is Rasa installed and in PATH?")
     except Exception as e:
         logger.error(f"Failed to start Rasa API service: {e}", exc_info=True)
-        if 'process' in locals() and hasattr(process, 'pid'): # If process object exists
-            RASA_API_PID_FILE.unlink(missing_ok=True)
+        if 'process' in locals() and hasattr(process, 'pid'): RASA_API_PID_FILE.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Error starting Rasa API: {str(e)}")
 
 @app.post("/rasa/stop", response_model=RasaStatusResponse, summary="Stop the Rasa API service")
 async def stop_rasa_api_service_endpoint():
     pid = _get_running_rasa_pid_from_file()
     if not pid:
-        RASA_API_PID_FILE.unlink(missing_ok=True) # Clean if somehow left behind
+        RASA_API_PID_FILE.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail="Rasa API service is not running or PID file is missing/invalid.")
-
     logger.info(f"Attempting to stop Rasa API service (PID: {pid}).")
     try:
         parent = psutil.Process(pid)
         children = parent.children(recursive=True)
         for child in children:
             try: child.terminate()
-            except psutil.Error: pass # Ignore errors if child already gone or permissions issue
-        gone, alive = psutil.wait_procs(children, timeout=3) # Wait for children to terminate
+            except psutil.Error: pass
+        _, alive = psutil.wait_procs(children, timeout=3)
+        for p_alive in alive:
+            try: p_alive.kill()
+            except psutil.Error: pass
+        parent.terminate()
+        try: parent.wait(timeout=10)
+        except psutil.TimeoutExpired: parent.kill(); parent.wait(timeout=5)
+        RASA_API_PID_FILE.unlink(missing_ok=True)
+        logger.info(f"Rasa API service (PID: {pid}) stopped.")
+        return RasaStatusResponse(status="stopped", message="Rasa API service stopped.")
+    except psutil.NoSuchProcess:
+        RASA_API_PID_FILE.unlink(missing_ok=True)
+        logger.warning(f"Rasa API service (PID: {pid}) was already stopped. PID file cleaned.")
+        return RasaStatusResponse(status="stopped", message="Rasa API was not running. PID file cleaned.")
+    except Exception as e:
+        logger.error(f"Error stopping Rasa API (PID: {pid}): {e}", exc_info=True)
+        if pid and not psutil.pid_exists(pid): RASA_API_PID_FILE.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to stop Rasa API: {str(e)}")
+
+@app.get("/rasa/status", response_model=RasaStatusResponse, summary="Get Rasa API service status")
+async def get_rasa_api_service_status_endpoint():
+    pid = _get_running_rasa_pid_from_file()
+    active_model_file = MODELS_DIR / ACTIVE_MODEL_FILENAME
+    active_model_source_file = MODELS_DIR / ".active_model_source"
+    model_name_display = "N/A"; log_file_rel_path = None
+    if RASA_API_LOG_FILE.is_file():
+        try: log_file_rel_path = str(RASA_API_LOG_FILE.relative_to(RASA_PROJECT_BASE))
+        except ValueError: log_file_rel_path = str(RASA_API_LOG_FILE)
+    if active_model_source_file.exists():
+        try:
+            model_name_display = active_model_source_file.read_text().strip()
+            if not active_model_file.exists(): model_name_display += " (active model file missing!)"
+        except Exception as e: logger.error(f"Error reading active model source file for status: {e}", exc_info=True); model_name_display = "Error reading active model name"
+    elif active_model_file.exists(): model_name_display = f"{ACTIVE_MODEL_FILENAME} (source name unknown)"
+    if pid:
+        try:
+            p = psutil.Process(pid)
+            if p.status() == psutil.STATUS_ZOMBIE:
+                RASA_API_PID_FILE.unlink(missing_ok=True)
+                return RasaStatusResponse(status="error", message="Rasa API process is a zombie. PID file cleaned.", pid=pid, log_file=log_file_rel_path)
+            return RasaStatusResponse(status="running", pid=pid, model_name=model_name_display, port=RASA_API_PORT, log_file=log_file_rel_path)
+        except psutil.NoSuchProcess:
+            RASA_API_PID_FILE.unlink(missing_ok=True)
+            return RasaStatusResponse(status="stopped", message="Rasa API was stopped (process not found). PID file cleaned.", log_file=log_file_rel_path)
+        except Exception as e:
+            logger.error(f"Error checking status for Rasa API process (PID: {pid}): {e}", exc_info=True)
+            if not psutil.pid_exists(pid):
+                 RASA_API_PID_FILE.unlink(missing_ok=True)
+                 return RasaStatusResponse(status="stopped", message=f"Rasa process {pid} disappeared during status check.", log_file=log_file_rel_path)
+            return RasaStatusResponse(status="error", message=f"Error checking process status: {str(e)}", pid=pid, log_file=log_file_rel_path)
+    return RasaStatusResponse(status="stopped", message="Rasa API service is stopped.", log_file=log_file_rel_path)
+
+
+# --- Rasa Actions Service Management ---
+def _get_running_rasa_actions_pid_from_file() -> Optional[int]:
+    if not RASA_ACTIONS_PID_FILE.exists(): return None
+    try:
+        pid_str = RASA_ACTIONS_PID_FILE.read_text().strip()
+        if not pid_str: RASA_ACTIONS_PID_FILE.unlink(missing_ok=True); return None
+        pid = int(pid_str)
+        if psutil.pid_exists(pid):
+            # More robust check: Ensure the process command line involves 'rasa actions'
+            # p = psutil.Process(pid)
+            # if "rasa" in " ".join(p.cmdline()).lower() and "actions" in " ".join(p.cmdline()).lower():
+            #     return pid
+            # else: # PID exists but not for rasa actions
+            #     logger.warning(f"PID {pid} from {RASA_ACTIONS_PID_FILE} exists but does not seem to be a Rasa Actions server. Cleaning up PID file.")
+            #     RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+            #     return None
+            return pid # Basic check is often sufficient
+        else: RASA_ACTIONS_PID_FILE.unlink(missing_ok=True); return None # Stale PID
+    except (ValueError, FileNotFoundError, psutil.Error) as e:
+        logger.warning(f"Error processing PID file '{RASA_ACTIONS_PID_FILE}': {e}. Cleaning up.")
+        RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+        return None
+
+@app.post("/rasa/actions/start", response_model=RasaStatusResponse, summary="Start the Rasa Actions service")
+async def start_rasa_actions_service_endpoint():
+    if _get_running_rasa_actions_pid_from_file():
+        raise HTTPException(status_code=400, detail="Rasa Actions service appears to be already running.")
+
+    # Check if actions directory exists (basic check)
+    actions_dir = RASA_ROOT / "actions"
+    if not actions_dir.exists() or not (actions_dir / "__init__.py").exists():
+         logger.warning(f"Actions directory '{actions_dir}' or '__init__.py' not found. Rasa Actions might fail if not configured correctly elsewhere.")
+         # Not raising HTTPException, as Rasa might be configured with a different actions package path.
+
+    rasa_actions_command = ["rasa", "run", "actions", "--actions", "actions", "--port", str(RASA_ACTIONS_PORT), "--cors", "*"]
+    # If you have specific python files for actions e.g. actions/actions.py, Rasa usually auto-detects.
+    # The --actions flag specifies the package name.
+    logger.info(f"Attempting to start Rasa Actions service. CWD: '{RASA_ROOT}', Cmd: '{' '.join(rasa_actions_command)}'")
+
+    try:
+        ensure_directory(RASA_LOGS_DIR, "Rasa Logs") # Ensure log dir exists
+        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0) if os.name == 'nt' else 0
+        
+        with open(RASA_ACTIONS_LOG_FILE, 'ab') as log_f: # Append binary mode
+            process = subprocess.Popen(rasa_actions_command, cwd=str(RASA_ROOT), stdout=log_f, stderr=log_f, creationflags=creationflags)
+        
+        RASA_ACTIONS_PID_FILE.write_text(str(process.pid))
+        logger.info(f"Rasa Actions service process started (PID: {process.pid}). Logging to '{RASA_ACTIONS_LOG_FILE}'.")
+        
+        await asyncio.sleep(5) # Allow some time for the actions server to start or fail
+
+        log_file_rel_path = str(RASA_ACTIONS_LOG_FILE.relative_to(RASA_PROJECT_BASE)) if RASA_ACTIONS_LOG_FILE.is_relative_to(RASA_PROJECT_BASE) else str(RASA_ACTIONS_LOG_FILE)
+
+        if psutil.pid_exists(process.pid):
+            p_status = psutil.Process(process.pid).status()
+            if p_status not in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
+                return RasaStatusResponse(
+                    status="running", 
+                    pid=process.pid, 
+                    port=RASA_ACTIONS_PORT, 
+                    log_file=log_file_rel_path,
+                    message="Rasa Actions service started."
+                )
+        
+        # If process doesn't exist or is zombie/dead
+        RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+        detail_msg = f"Rasa Actions process (PID: {process.pid if 'process' in locals() else 'N/A'}) did not stay alive. Check logs at '{log_file_rel_path}'."
+        logger.error(detail_msg)
+        raise HTTPException(status_code=500, detail=detail_msg)
+
+    except FileNotFoundError: # For 'rasa' command
+        logger.error("Rasa command not found. Is Rasa installed and in PATH?", exc_info=True)
+        raise HTTPException(status_code=500, detail="Rasa command not found. Is Rasa installed and in PATH?")
+    except Exception as e:
+        logger.error(f"Failed to start Rasa Actions service: {e}", exc_info=True)
+        if 'process' in locals() and hasattr(process, 'pid'): # If process object exists
+            RASA_ACTIONS_PID_FILE.unlink(missing_ok=True) # Clean up PID if process was created but failed
+        raise HTTPException(status_code=500, detail=f"Error starting Rasa Actions service: {str(e)}")
+
+@app.post("/rasa/actions/stop", response_model=RasaStatusResponse, summary="Stop the Rasa Actions service")
+async def stop_rasa_actions_service_endpoint():
+    pid = _get_running_rasa_actions_pid_from_file()
+    if not pid:
+        RASA_ACTIONS_PID_FILE.unlink(missing_ok=True) # Clean if somehow left behind
+        raise HTTPException(status_code=400, detail="Rasa Actions service is not running or PID file is missing/invalid.")
+
+    logger.info(f"Attempting to stop Rasa Actions service (PID: {pid}).")
+    try:
+        parent = psutil.Process(pid)
+        children = parent.children(recursive=True)
+        for child in children:
+            try: child.terminate()
+            except psutil.Error: pass # Ignore errors if child already gone
+        
+        gone, alive = psutil.wait_procs(children, timeout=3) # Wait for children
         for p_alive in alive: # Force kill any remaining children
             try: p_alive.kill()
             except psutil.Error: pass
@@ -498,138 +586,100 @@ async def stop_rasa_api_service_endpoint():
         try:
             parent.wait(timeout=10) # Wait for parent to terminate
         except psutil.TimeoutExpired:
-            logger.warning(f"Rasa parent process {pid} did not terminate gracefully, attempting to kill.")
+            logger.warning(f"Rasa Actions parent process {pid} did not terminate gracefully, attempting to kill.")
             parent.kill()
-            parent.wait(timeout=5) # Wait a bit after kill, raises TimeoutExpired if still running
+            parent.wait(timeout=5) # Wait a bit after kill
 
-        RASA_API_PID_FILE.unlink(missing_ok=True)
-        logger.info(f"Rasa API service (PID: {pid}) stopped.")
-        return RasaStatusResponse(status="stopped", message="Rasa API service stopped.")
+        RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+        logger.info(f"Rasa Actions service (PID: {pid}) stopped.")
+        return RasaStatusResponse(status="stopped", message="Rasa Actions service stopped.")
     except psutil.NoSuchProcess:
-        logger.warning(f"Rasa API service (PID: {pid}) was already stopped (process not found). Cleaning PID file.")
-        RASA_API_PID_FILE.unlink(missing_ok=True)
-        return RasaStatusResponse(status="stopped", message="Rasa API was not running (process not found). PID file cleaned.")
+        logger.warning(f"Rasa Actions service (PID: {pid}) was already stopped (process not found). Cleaning PID file.")
+        RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+        return RasaStatusResponse(status="stopped", message="Rasa Actions service was not running (process not found). PID file cleaned.")
     except Exception as e:
-        logger.error(f"Error stopping Rasa API (PID: {pid}): {e}", exc_info=True)
-        # If process is confirmed dead, ensure PID file is gone. Otherwise, it might still be running.
+        logger.error(f"Error stopping Rasa Actions service (PID: {pid}): {e}", exc_info=True)
+        # If process is confirmed dead, ensure PID file is gone.
         if pid and not psutil.pid_exists(pid):
-            RASA_API_PID_FILE.unlink(missing_ok=True)
-        raise HTTPException(status_code=500, detail=f"Failed to stop Rasa API: {str(e)}")
+            RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to stop Rasa Actions service: {str(e)}")
 
-@app.get("/rasa/status", response_model=RasaStatusResponse, summary="Get Rasa API service status")
-async def get_rasa_api_service_status_endpoint():
-    pid = _get_running_rasa_pid_from_file()
-    active_model_file = MODELS_DIR / ACTIVE_MODEL_FILENAME
-    active_model_source_file = MODELS_DIR / ".active_model_source"
-    model_name_display = "N/A"
+@app.get("/rasa/actions/status", response_model=RasaStatusResponse, summary="Get Rasa Actions service status")
+async def get_rasa_actions_service_status_endpoint():
+    pid = _get_running_rasa_actions_pid_from_file()
     log_file_rel_path = None
 
-    if RASA_API_LOG_FILE.is_file(): # Check before trying to make relative
-        try: log_file_rel_path = str(RASA_API_LOG_FILE.relative_to(RASA_PROJECT_BASE))
-        except ValueError: log_file_rel_path = str(RASA_API_LOG_FILE) # Not relative, use absolute
-
-    if active_model_source_file.exists():
-        try:
-            model_name_display = active_model_source_file.read_text().strip()
-            if not active_model_file.exists():
-                model_name_display += " (active model file missing!)"
-        except Exception as e:
-            logger.error(f"Error reading active model source file for status: {e}", exc_info=True)
-            model_name_display = "Error reading active model name"
-
-    elif active_model_file.exists(): # If source file doesn't exist but active_model.tar.gz does
-        model_name_display = f"{ACTIVE_MODEL_FILENAME} (source name unknown)"
+    if RASA_ACTIONS_LOG_FILE.is_file():
+        try: log_file_rel_path = str(RASA_ACTIONS_LOG_FILE.relative_to(RASA_PROJECT_BASE))
+        except ValueError: log_file_rel_path = str(RASA_ACTIONS_LOG_FILE) # Not relative, use absolute
 
     if pid:
         try:
             p = psutil.Process(pid)
             if p.status() == psutil.STATUS_ZOMBIE: # Explicitly check for zombie
-                RASA_API_PID_FILE.unlink(missing_ok=True) # Clean up stale PID file
-                return RasaStatusResponse(status="error", message="Rasa API process is a zombie. PID file cleaned.", pid=pid, log_file=log_file_rel_path)
-
-            # Optional: More robust check if the process is indeed a Rasa process
+                RASA_ACTIONS_PID_FILE.unlink(missing_ok=True) # Clean up stale PID file
+                return RasaStatusResponse(status="error", message="Rasa Actions process is a zombie. PID file cleaned.", pid=pid, log_file=log_file_rel_path)
+            
+            # Optional: More robust check if the process is indeed a Rasa actions process
             # cmdline = " ".join(p.cmdline()).lower()
-            # if "rasa" not in cmdline:
-            #     logger.warning(f"PID {pid} exists but cmdline ('{cmdline}') does not suggest a Rasa process. Cleaning PID.")
-            #     RASA_API_PID_FILE.unlink(missing_ok=True)
-            #     return RasaStatusResponse(status="stopped", message=f"PID {pid} is not a Rasa process. PID file cleaned.", log_file=log_file_rel_path)
+            # if not ("rasa" in cmdline and "actions" in cmdline):
+            #     logger.warning(f"PID {pid} exists but cmdline ('{cmdline}') does not suggest a Rasa Actions process. Cleaning PID.")
+            #     RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+            #     return RasaStatusResponse(status="stopped", message=f"PID {pid} is not a Rasa Actions process. PID file cleaned.", log_file=log_file_rel_path)
 
-            return RasaStatusResponse(
-                status="running", pid=pid, model_name=model_name_display, port=RASA_API_PORT,
-                log_file=log_file_rel_path)
+            return RasaStatusResponse(status="running", pid=pid, port=RASA_ACTIONS_PORT, log_file=log_file_rel_path)
         except psutil.NoSuchProcess:
-            RASA_API_PID_FILE.unlink(missing_ok=True) # Clean up stale PID file
-            return RasaStatusResponse(status="stopped", message="Rasa API was stopped (process not found). PID file cleaned.", log_file=log_file_rel_path)
+            RASA_ACTIONS_PID_FILE.unlink(missing_ok=True) # Clean up stale PID file
+            return RasaStatusResponse(status="stopped", message="Rasa Actions service was stopped (process not found). PID file cleaned.", log_file=log_file_rel_path)
         except Exception as e: # Catch other psutil errors or general exceptions
-            logger.error(f"Error checking status for Rasa API process (PID: {pid}): {e}", exc_info=True)
-            # Potentially check if PID still exists before declaring error vs stopped
-            if not psutil.pid_exists(pid):
-                 RASA_API_PID_FILE.unlink(missing_ok=True)
-                 return RasaStatusResponse(status="stopped", message=f"Rasa process {pid} disappeared during status check.", log_file=log_file_rel_path)
-            return RasaStatusResponse(status="error", message=f"Error checking process status: {str(e)}", pid=pid, log_file=log_file_rel_path)
-    return RasaStatusResponse(status="stopped", message="Rasa API service is stopped.", log_file=log_file_rel_path)
+            logger.error(f"Error checking status for Rasa Actions process (PID: {pid}): {e}", exc_info=True)
+            if not psutil.pid_exists(pid): # If process disappeared during check
+                 RASA_ACTIONS_PID_FILE.unlink(missing_ok=True)
+                 return RasaStatusResponse(status="stopped", message=f"Rasa Actions process {pid} disappeared during status check.", log_file=log_file_rel_path)
+            return RasaStatusResponse(status="error", message=f"Error checking Rasa Actions process status: {str(e)}", pid=pid, log_file=log_file_rel_path)
+    
+    return RasaStatusResponse(status="stopped", message="Rasa Actions service is stopped.", log_file=log_file_rel_path)
+
 
 # --- YAML File Management Endpoints ---
 def _read_yaml_file(file_path: Path, default_content: Optional[Dict] = None):
-    if default_content is None: default_content = {} # Ensure it's a dict for consistency
+    if default_content is None: default_content = {}
     if not file_path.exists():
         logger.warning(f"YAML file not found: {file_path}. Returning default content: {default_content}")
         return {"content": default_content}
-    yaml_parser = YAML()
-    yaml_parser.preserve_quotes = True
-    yaml_parser.explicit_start = True
+    yaml_parser = YAML(); yaml_parser.preserve_quotes = True; yaml_parser.explicit_start = True
     try:
         content = yaml_parser.load(file_path)
-        return {"content": content if content is not None else default_content} # Ensure content is not None
+        return {"content": content if content is not None else default_content}
     except Exception as e:
         logger.error(f"Error reading or parsing YAML file {file_path}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Could not read or parse {file_path.name}: {str(e)}")
 
 def _write_yaml_file(file_path: Path, data: YAMLContent, indent_options: Optional[Dict] = None):
     ensure_directory(file_path.parent, f"{file_path.parent.name} directory")
-    yaml_writer = YAML()
-    yaml_writer.preserve_quotes = False # Generally don't need to preserve quotes on write for Rasa files
-    yaml_writer.explicit_start = True
-    if indent_options:
-        yaml_writer.indent(**indent_options)
-    else: # Default Rasa-like indentation
-        yaml_writer.indent(mapping=2, sequence=4, offset=2)
-
+    yaml_writer = YAML(); yaml_writer.preserve_quotes = False; yaml_writer.explicit_start = True
+    if indent_options: yaml_writer.indent(**indent_options)
+    else: yaml_writer.indent(mapping=2, sequence=4, offset=2)
     try:
         content_to_write = data.content
         if file_path.name == "nlu.yml" and "nlu" in content_to_write and isinstance(content_to_write.get("nlu"), list):
             for item in content_to_write["nlu"]:
                 if isinstance(item, dict) and "examples" in item and isinstance(item["examples"], str):
                     examples_text = item["examples"].replace('\\n', '\n').strip()
-                    examples_text = re.sub(r'^["\'](.*)["\']$', r'\1', examples_text, flags=re.DOTALL) # Remove quotes if present
+                    examples_text = re.sub(r'^["\'](.*)["\']$', r'\1', examples_text, flags=re.DOTALL)
                     lines = [line.strip() for line in examples_text.split('\n') if line.strip()]
-                    processed_lines = []
-                    for line in lines:
-                        if line and not line.startswith('- '): processed_lines.append(f"- {line}")
-                        elif line: processed_lines.append(line) # If it already starts with '- ' or is just '-'
-
-                    if processed_lines: # Only use LiteralScalarString if there's content
-                        item["examples"] = LiteralScalarString('\n'.join(processed_lines) + '\n') # Ensure trailing newline for block
-                    else: # Handle empty examples case
-                        item["examples"] = LiteralScalarString('') # Or just "" if LiteralScalarString not needed for empty
-
-
+                    processed_lines = [f"- {line}" if line and not line.startswith('- ') else line for line in lines if line]
+                    if processed_lines: item["examples"] = LiteralScalarString('\n'.join(processed_lines) + '\n')
+                    else: item["examples"] = LiteralScalarString('')
         if file_path.name == "domain.yml" and "responses" in content_to_write:
             if isinstance(content_to_write.get("responses"), dict):
-                for resp_key, resp_list in content_to_write["responses"].items():
+                for resp_list in content_to_write["responses"].values():
                     if isinstance(resp_list, list):
                         for i, item_resp in enumerate(resp_list):
                             if isinstance(item_resp, dict) and "text" in item_resp and isinstance(item_resp["text"], str):
-                                text_content = item_resp["text"].strip() # Strip whitespace
-                                if "\n" in text_content: # Multiline text
-                                    item_resp["text"] = LiteralScalarString(text_content + '\n')
-                                # elif not text_content: # If text becomes empty after strip
-                                #     item_resp["text"] = "" # Set to empty string
-                                # else: # Single line, non-empty, keep as is
-                                #     item_resp["text"] = text_content
-
-        with open(file_path, "w", encoding="utf-8") as f:
-            yaml_writer.dump(content_to_write, f)
+                                text_content = item_resp["text"].strip()
+                                if "\n" in text_content: item_resp["text"] = LiteralScalarString(text_content + '\n')
+        with open(file_path, "w", encoding="utf-8") as f: yaml_writer.dump(content_to_write, f)
         return {"success": True, "message": f"{file_path.name} updated successfully at {file_path}."}
     except Exception as e:
         logger.error(f"Failed to save YAML file {file_path}: {e}", exc_info=True)
@@ -651,10 +701,9 @@ def get_stories_data(): return _read_yaml_file(STORIES_PATH, default_content={"v
 def update_stories_data(data: YAMLContent): return _write_yaml_file(STORIES_PATH, data)
 
 @app.get("/domain", summary="Get Domain data")
-def get_domain_data(): return _read_yaml_file(DOMAIN_PATH, default_content={"version": "3.1", "intents": [], "responses": {}, "actions": []}) # More complete default
+def get_domain_data(): return _read_yaml_file(DOMAIN_PATH, default_content={"version": "3.1", "intents": [], "responses": {}, "actions": []})
 @app.post("/domain", summary="Update Domain data")
 def update_domain_data(data: YAMLContent): return _write_yaml_file(DOMAIN_PATH, data)
-
 
 # --- Rasa Train Endpoint ---
 @app.post("/train", response_model=Dict[str, Any], summary="Trigger Rasa model training")
@@ -663,32 +712,22 @@ async def train_rasa_model():
     if not RASA_ROOT.exists() or not (RASA_ROOT / "config.yml").exists():
         logger.error(f"RASA_ROOT '{RASA_ROOT}' is not a valid Rasa project (missing config.yml or directory).")
         raise HTTPException(status_code=500, detail=f"RASA_ROOT '{RASA_ROOT}' is not a valid Rasa project.")
-    ensure_directory(MODELS_DIR, "Rasa Models") # Ensure models dir exists before training
-
+    ensure_directory(MODELS_DIR, "Rasa Models")
     try:
-        # Using asyncio.create_subprocess_exec for non-blocking execution in async context
         process = await asyncio.create_subprocess_exec(
-            "rasa", "train", # Add flags like "--force", "--augmentation", "0" if needed
-            cwd=str(RASA_ROOT),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            "rasa", "train", cwd=str(RASA_ROOT),
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
-        stdout, stderr = await process.communicate() # Wait for completion
-
+        stdout, stderr = await process.communicate()
         stdout_decoded = stdout.decode(errors='ignore') if stdout else ""
         stderr_decoded = stderr.decode(errors='ignore') if stderr else ""
-
         if stdout_decoded: logger.info(f"Rasa train stdout:\n{stdout_decoded}")
         if stderr_decoded: logger.error(f"Rasa train stderr:\n{stderr_decoded}")
-
         if process.returncode != 0:
-            # Consider parsing stderr for more specific error messages if Rasa provides them structured
             return {"success": False, "output": stdout_decoded, "error": stderr_decoded, "message": "Rasa training failed."}
-
         return {"success": True, "output": stdout_decoded, "error": stderr_decoded, "message": "Rasa training completed successfully."}
-
     except FileNotFoundError:
-        logger.error("Rasa command not found. Is Rasa installed and in system PATH?", exc_info=True)
+        logger.error("Rasa command not found.", exc_info=True)
         raise HTTPException(status_code=500, detail="Rasa command not found. Ensure Rasa is installed and in PATH.")
     except Exception as e:
         logger.error(f"Rasa training process failed: {e}", exc_info=True)
@@ -699,7 +738,6 @@ if __name__ == "__main__":
     import uvicorn
     logger.info(f"Starting Uvicorn server for main:app on http://localhost:8000")
     logger.info(f"Effective RASA_ROOT is {RASA_ROOT.resolve() if RASA_ROOT else 'Not Set'}")
-    # reload=True is great for development; for production, it should be False.
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 # from fastapi import FastAPI, HTTPException, Depends, Query

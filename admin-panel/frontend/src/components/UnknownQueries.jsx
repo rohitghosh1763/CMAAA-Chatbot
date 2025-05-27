@@ -201,22 +201,7 @@ const UnknownQueries = () => {
         setLoading(false);
     };
     
-    const handleTrain = async () => {
-        setLoading(true);
-        setToast({ type: "info", message: "Training model... This may take a while." });
-        try {
-            const response = await fetch(`${API_BASE_URL}/train`, { method: "POST" }); //
-            const result = await response.json();
-            if (!response.ok || !result.success) {
-                throw new Error(result.error || result.detail || `Training request failed. Status: ${response.status}`);
-            }
-            setToast({ type: "success", message: "Model training initiated successfully!" });
-        } catch (err) {
-             setToast({ type: "error", message: `Training failed: ${err.message}` });
-        } finally {
-            setLoading(false);
-        }
-    };
+    
 
     const ToastNotification = () => {
         useEffect(() => {
@@ -272,9 +257,7 @@ const UnknownQueries = () => {
                         <h1 className="text-2xl font-bold text-slate-800">
                             Unknown Queries Management
                         </h1>
-                        <Button onClick={handleTrain} className="bg-purple-600 hover:bg-purple-700" disabled={loading}>
-                            <Zap size={18} className="mr-2" /> {loading ? "Processing..." : "Train Model"}
-                        </Button>
+                        
                     </div>
 
                     {/* Filters */}
