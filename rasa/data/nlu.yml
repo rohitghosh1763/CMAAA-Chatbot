@@ -1,6 +1,15 @@
 ---
 version: '3.1'
 nlu:
+  - intent: inquiry
+    examples: |
+      - how are you?
+      - how you doing?
+      - whatsup
+      - what's up
+      - hey! how are you doing?
+      - how is things going around?
+      - how are you doing bro?
   - intent: greet
     examples: |
       - hey
@@ -18,7 +27,7 @@ nlu:
       - good morning
       - kaise ho
       - hello everyone
-      - ram ram bhai
+      - ram ram amlan
   - intent: goodbye
     examples: |
       - cu
@@ -108,3 +117,5 @@ nlu:
       - 53254325425
       - ||}{
       - l;'[]l;'
+      - 73r7684r37hgjcdshgjdsh
+      - lo32ycbrilw3yrbvciawyri3ylw

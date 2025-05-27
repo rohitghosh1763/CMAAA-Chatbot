@@ -1,23 +1,23 @@
-# In your rules.yml
-version: "3.1"
-
+---
+version: '3.1'
 rules:
-    - rule: Respond to greetings
-      steps:
-          - intent: greet
-          - action: utter_greet
-
-    - rule: Say goodbye anytime the user says goodbye
-      steps:
-          - intent: goodbye
-          - action: utter_goodbye
-
-    - rule: Welcome the user on session start
-      steps:
-          - intent: welcome_user
-          - action: utter_welcome
-
-    - rule: Handle low NLU confidence
-      steps:
-          - intent: nlu_fallback
-          - action: action_default_fallback
+  - rule: respond to user's inquiry
+    steps:
+      - intent: inquiry
+      - action: utter_inquiry
+  - rule: Respond to greetings
+    steps:
+      - intent: greet
+      - action: utter_greet
+  - rule: Say goodbye anytime the user says goodbye
+    steps:
+      - intent: goodbye
+      - action: utter_goodbye
+  - rule: Welcome the user on session start
+    steps:
+      - intent: welcome_user
+      - action: utter_welcome
+  - rule: Handle low NLU confidence
+    steps:
+      - intent: nlu_fallback
+      - action: action_default_fallback

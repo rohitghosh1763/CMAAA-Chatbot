@@ -54,6 +54,9 @@ responses:
     - text: I didn't quite catch that. Can you say it differently?
     - text: Sorry, I don't understand. Could you try again with different words?
     - text: I'm having trouble understanding. Could you explain it another way?
+  utter_inquiry:
+    - text: I am doing Good! Thanks for asking.
+    - text: I am great! How about you?
 actions:
   - action_default_fallback
 forms: {}

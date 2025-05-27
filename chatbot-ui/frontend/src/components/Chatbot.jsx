@@ -1,8 +1,9 @@
-// src/components/Chatbot.jsx (Modified)
+// src/components/Chatbot.jsx (Improved UI)
 import { useState, useEffect, useRef } from "react";
+import { Send, X, MessageSquare, User } from "lucide-react"; // Import icons
 
 // Add 'onClose' prop for a potential close button inside the chatbot
-function Chatbot({ onClose }) { 
+function Chatbot({ onClose }) {
     const [message, setMessage] = useState("");
     const [chatHistory, setChatHistory] = useState([]);
     const [senderId, setSenderId] = useState("");
@@ -14,7 +15,7 @@ function Chatbot({ onClose }) {
 
     useEffect(() => {
         let currentSenderId = localStorage.getItem("chatbotSenderId");
-        
+
         if (!currentSenderId) {
             currentSenderId = `web_user_${Math.random()
                 .toString(36)
@@ -25,7 +26,7 @@ function Chatbot({ onClose }) {
 
         if (!welcomeMessageShown.current) {
             welcomeMessageShown.current = true;
-            
+
             const welcomeMessages = [
                 "Hi! Nice to see you. How's your day going?",
                 "Hello there! Welcome to our chatbot. How can I help you today?",
@@ -33,12 +34,12 @@ function Chatbot({ onClose }) {
                 "Hey! Thanks for stopping by. What can I do for you?",
                 "Greetings! How may I assist you today?"
             ];
-            
+
             const randomIndex = Math.floor(Math.random() * welcomeMessages.length);
             const randomWelcomeMessage = welcomeMessages[randomIndex];
-            
+
             setTimeout(() => {
-                const welcomeMessageOutput = { // Renamed to avoid conflict with global 'message'
+                const welcomeMessageOutput = {
                     text: randomWelcomeMessage,
                     sender: "bot",
                     type: "text"
@@ -47,14 +48,12 @@ function Chatbot({ onClose }) {
             }, 500);
         }
 
-        // Focus the input field when the chatbot mounts (becomes visible)
         if (inputRef.current) {
-            setTimeout(() => { // Timeout helps ensure focus after transitions
+            setTimeout(() => {
                 inputRef.current.focus();
-            }, 100); 
+            }, 100);
         }
-
-    }, []); // Empty dependency array ensures this runs once on mount
+    }, []);
 
     useEffect(() => {
         chatMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -77,23 +76,25 @@ function Chatbot({ onClose }) {
             setChatHistory((prevHistory) => [...prevHistory, userMessageEntry]);
         }
         setIsLoading(true);
-        if (payload === message) { // Check against component's message state
+        if (payload === message) {
             setMessage("");
         }
         try {
-            const backendUrl = "http://localhost:5000/chat"; // Ensure your backend is running
+            const backendUrl = "http://localhost:5000/chat";
             const response = await fetch(backendUrl, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: payload, sender: idToUse }), // 'message' here refers to the payload
+                body: JSON.stringify({ message: payload, sender: idToUse }),
             });
             if (!response.ok) {
                 let errorData;
-                try { errorData = await response.json(); } 
+                try { errorData = await response.json(); }
                 catch (e) { errorData = [{ text: `Error: ${response.statusText || "Server connection issue"}` }]; }
-                const errorMessages = errorData.map((err) => ({
-                    text: err.text || "An unknown error occurred.", sender: "bot", type: "error",
-                }));
+                
+                const errorMessages = (Array.isArray(errorData) ? errorData : [{ text: errorData.message || errorData.detail || "An unknown error occurred." }])
+                    .map((err) => ({
+                        text: err.text || "An unknown error occurred.", sender: "bot", type: "error",
+                    }));
                 setChatHistory((prevHistory) => [...prevHistory, ...errorMessages]);
                 return;
             }
@@ -112,14 +113,14 @@ function Chatbot({ onClose }) {
             setChatHistory((prevHistory) => [...prevHistory, networkErrorMessage]);
         } finally {
             setIsLoading(false);
-            inputRef.current?.focus();
+            setTimeout(() => inputRef.current?.focus(), 0); // Ensure focus happens after state update
         }
     };
 
     const handleSubmit = (event) => {
         event.preventDefault();
-        if (!message.trim() || !senderId) return; // Check against component's message state
-        sendPayloadToRasa(message, message, senderId); // Pass component's message state
+        if (!message.trim() || !senderId) return;
+        sendPayloadToRasa(message, message, senderId);
     };
 
     const handleRasaButtonClick = (buttonPayload, buttonTitle) => {
@@ -127,100 +128,115 @@ function Chatbot({ onClose }) {
         sendPayloadToRasa(buttonPayload, buttonTitle, senderId);
     };
 
+    const BotTypingIndicator = () => (
+        <div className="flex items-center space-x-1 p-2">
+            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+            <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+        </div>
+    );
+
     return (
-        <div className="w-full min-w-[360px] max-w-lg bg-white shadow-xl rounded-lg flex flex-col h-[60vh] font-sans"> {/* MODIFIED LINE */}
-            <header className="bg-blue-600 text-white p-4 rounded-t-lg flex justify-between items-center">
-                <h1 className="text-xl font-semibold text-center">
-                    Rasa ChatBot
-                </h1>
+        <div className="w-full min-w-[360px] max-w-md bg-white shadow-2xl rounded-xl flex flex-col h-[70vh] min-h-[450px] max-h-[700px] font-sans border border-slate-200">
+            <header className="bg-slate-800 text-white p-4 rounded-t-xl flex justify-between items-center shadow-md">
+                <div className="flex items-center">
+                    <MessageSquare size={24} className="mr-3" />
+                    <h1 className="text-lg font-semibold">
+                        Support Chat
+                    </h1>
+                </div>
                 {onClose && (
-                     <button 
-                        onClick={onClose} 
-                        className="text-white hover:text-gray-200 p-1"
+                    <button
+                        onClick={onClose}
+                        className="text-slate-300 hover:text-white p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-slate-400 transition-colors"
                         aria-label="Close chat"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <X size={20} />
                     </button>
                 )}
             </header>
 
-            <main className="flex-grow p-4 space-y-4 overflow-y-auto bg-gray-50">
+            <main className="flex-grow p-4 space-y-3 overflow-y-auto bg-slate-50 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
                 {chatHistory.map((chatItem, index) => (
                     <div
                         key={index}
-                        className={`flex ${
-                            chatItem.sender === "user"
-                                ? "justify-end"
-                                : "justify-start"
-                        }`}
-                    >
-                        <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-xl shadow ${
-                                chatItem.sender === "user"
-                                    ? "bg-blue-500 text-white rounded-br-none"
-                                    : "bg-gray-200 text-gray-800 rounded-bl-none"
+                        className={`flex items-end gap-2 ${chatItem.sender === "user" ? "justify-end" : "justify-start"
                             }`}
+                    >
+                        {chatItem.sender === "bot" && (
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white mb-1">
+                                <MessageSquare size={16} />
+                            </div>
+                        )}
+                        <div
+                            className={`max-w-[70%] lg:max-w-[75%] px-4 py-2.5 rounded-2xl shadow-sm ${chatItem.sender === "user"
+                                ? "bg-blue-600 text-white rounded-br-none"
+                                : `bg-white text-slate-800 border border-slate-200 rounded-bl-none ${chatItem.type === "error" ? "bg-red-50 border-red-300 text-red-700" : ""}`
+                                }`}
                         >
                             {chatItem.text && (
-                                <p className="text-sm whitespace-pre-wrap break-words">{chatItem.text}</p>
+                                <p className={`text-sm whitespace-pre-wrap break-words ${chatItem.type === "error" ? "font-medium" : ""}`}>{chatItem.text}</p>
                             )}
                             {chatItem.type === "image" && chatItem.image && (
                                 <img
                                     src={chatItem.image} alt="Bot content"
-                                    className="mt-2 rounded-lg max-w-full h-auto"
+                                    className="mt-2 rounded-lg max-w-full h-auto shadow"
                                     onError={(e) => { e.target.style.display = "none"; }}
                                 />
                             )}
                             {chatItem.type === "buttons" && chatItem.buttons && chatItem.buttons.length > 0 && (
-                                <div className="mt-2 flex flex-wrap gap-2">
+                                <div className="mt-2.5 flex flex-wrap gap-2">
                                     {chatItem.buttons.map((button, btnIndex) => (
                                         <button
                                             key={btnIndex}
                                             onClick={() => handleRasaButtonClick(button.payload, button.title)}
                                             disabled={isLoading}
-                                            className="bg-white text-blue-600 border border-blue-600 px-3 py-1 rounded-full text-sm hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="bg-blue-50 text-blue-700 border border-blue-300 px-3.5 py-1.5 rounded-full text-xs font-medium hover:bg-blue-100 hover:border-blue-400 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         >
                                             {button.title}
                                         </button>
                                     ))}
                                 </div>
                             )}
-                            {chatItem.type === "error" && chatItem.text && (
-                                <p className="text-sm text-red-600 font-medium">{chatItem.text}</p>
-                            )}
                         </div>
+                        {chatItem.sender === "user" && (
+                             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white mb-1">
+                                <User size={16} />
+                            </div>
+                        )}
                     </div>
                 ))}
                 {isLoading && (
-                    <div className="flex justify-start">
-                        <div className="px-4 py-2 rounded-lg bg-gray-200 text-gray-600 text-sm italic shadow rounded-bl-none">
-                            Bot is typing...
+                    <div className="flex justify-start items-end gap-2">
+                         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-white mb-1">
+                            <MessageSquare size={16} />
+                        </div>
+                        <div className="px-4 py-2.5 rounded-2xl shadow-sm bg-white text-slate-600 text-sm italic border border-slate-200 rounded-bl-none">
+                            <BotTypingIndicator />
                         </div>
                     </div>
                 )}
                 <div ref={chatMessagesEndRef} />
             </main>
 
-            <footer className="bg-gray-100 p-3 border-t border-gray-300 rounded-b-lg">
+            <footer className="bg-white p-3 border-t border-slate-200 rounded-b-xl shadow- ऊपर">
                 <form
                     onSubmit={handleSubmit}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2.5"
                 >
                     <input
                         ref={inputRef} type="text" value={message} onChange={handleInputChange}
-                        placeholder="Type your message..." aria-label="Chat message input"
+                        placeholder="Type a message..." aria-label="Chat message input"
                         disabled={isLoading || !senderId}
-                        className="flex-grow p-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-shadow"
+                        className="flex-grow p-3 border border-slate-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-150 text-sm placeholder-slate-400"
                     />
                     <button
                         type="submit"
                         disabled={isLoading || !message.trim() || !senderId}
-                        className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-blue-600 text-white p-3 rounded-full hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
                         aria-label="Send message"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                            <path d="M3.105 3.105a1.5 1.5 0 012.122-.001L19.21 11.143a1.5 1.5 0 010 2.121L5.227 19.254a1.5 1.5 0 01-2.122-.001l-.002-.001a1.5 1.5 0 01.002-2.121L14.88 12.5H5.25a.75.75 0 010-1.5h9.63L3.105 5.227a1.5 1.5 0 010-2.122z" />
-                        </svg>
+                        <Send size={18} />
                     </button>
                 </form>
             </footer>

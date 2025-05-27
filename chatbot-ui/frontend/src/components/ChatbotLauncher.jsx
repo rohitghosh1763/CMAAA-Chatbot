@@ -1,28 +1,46 @@
-// src/components/ChatbotLauncher.jsx
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Lottie from "lottie-react";
 import Chatbot from "./chatbot"; // Assuming your chatbot component file is named chatbot.jsx
-import robotAnimation from "../robot.json"; // Assuming robot.json is in the parent directory of components (e.g., src/robot.json)
+import robotAnimation from "../robot.json"; // Ensure this path is correct
 
-// Removed unused robotAnimationData prop from the function signature
 function ChatbotLauncher() {
     const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+    const launcherRef = useRef(null);
+    const chatbotContainerRef = useRef(null);
 
     const toggleChatbot = () => {
         setIsChatbotOpen(!isChatbotOpen);
     };
 
+    // Effect for handling clicks outside the chatbot to close it
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (isChatbotOpen &&
+                launcherRef.current && !launcherRef.current.contains(event.target) &&
+                chatbotContainerRef.current && !chatbotContainerRef.current.contains(event.target)
+            ) {
+                setIsChatbotOpen(false);
+            }
+        }
+
+        if (isChatbotOpen) {
+            document.addEventListener("mousedown", handleClickOutside);
+        } else {
+            document.removeEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [isChatbotOpen]);
+
+
     return (
         <>
             {/* Lottie Animation Button */}
             <div
-                style={{
-                    position: "fixed",
-                    bottom: "20px",
-                    right: "20px",
-                    zIndex: 1050,
-                    cursor: "pointer",
-                }}
+                ref={launcherRef}
+                className="fixed bottom-5 right-5 z-50 cursor-pointer p-2 bg-blue-600 rounded-full shadow-lg hover:bg-blue-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 onClick={toggleChatbot}
                 aria-label={isChatbotOpen ? "Close Chatbot" : "Open Chatbot"}
                 role="button"
@@ -33,22 +51,23 @@ function ChatbotLauncher() {
             >
                 <Lottie
                     animationData={robotAnimation}
-                    style={{ height: 100, width: 100 }}
+                    style={{ height: 60, width: 60 }} // Slightly smaller for a sleeker button
                     loop
                 />
             </div>
 
-            {/* Chatbot Component Container - Conditionally Rendered with Transition */}
+            {/* Chatbot Component Container */}
+            {/* Always rendered, visibility controlled by CSS for state persistence */}
             <div
-                className={`fixed bottom-[130px] right-[20px] z-[1000] 
-                            transition-all duration-300 ease-in-out 
-                            ${ // Updated animation classes
-                                isChatbotOpen
-                                    ? "opacity-100 translate-y-0"
-                                    : "opacity-0 translate-y-5 pointer-events-none" // Softer slide and fade, no scale
+                ref={chatbotContainerRef}
+                className={`fixed right-5 z-[1000] 
+                            transition-all duration-300 ease-in-out
+                            ${isChatbotOpen
+                                ? "opacity-100 translate-y-0 bottom-[calc(20px+60px+20px)]" // Launcher bottom + launcher height (60px from Lottie) + 20px gap
+                                : "opacity-0 translate-y-5 pointer-events-none bottom-[calc(20px+60px+20px)]" // Start slightly lower for slide-up, ensure it's not interactive when hidden
                             }`}
             >
-                {isChatbotOpen && <Chatbot onClose={toggleChatbot} />}
+                <Chatbot onClose={() => setIsChatbotOpen(false)} />
             </div>
         </>
     );
