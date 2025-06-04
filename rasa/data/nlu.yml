@@ -29,6 +29,7 @@ nlu:
       - hello everyone
       - ram ram amlan
       - gibberish
+      - hello everybody
   - intent: goodbye
     examples: |
       - cu
@@ -120,3 +121,4 @@ nlu:
       - l;'[]l;'
       - 73r7684r37hgjcdshgjdsh
       - lo32ycbrilw3yrbvciawyri3ylw
+      - uyhkzsvnygiuestn7use7t
