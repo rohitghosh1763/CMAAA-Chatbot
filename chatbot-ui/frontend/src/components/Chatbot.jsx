@@ -1,4 +1,5 @@
-// src/components/Chatbot.jsx (Improved UI)
+// src/components/Chatbot.jsx (Improved UI with Better Focus Management)
+
 import { useState, useEffect, useRef } from "react";
 import { Send, X, MessageSquare, User } from "lucide-react"; // Import icons
 
@@ -12,6 +13,15 @@ function Chatbot({ onClose }) {
     const chatMessagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const welcomeMessageShown = useRef(false);
+
+    // Function to focus input with a slight delay to ensure DOM is ready
+    const focusInput = () => {
+        setTimeout(() => {
+            if (inputRef.current && !inputRef.current.disabled) {
+                inputRef.current.focus();
+            }
+        }, 100);
+    };
 
     useEffect(() => {
         let currentSenderId = localStorage.getItem("chatbotSenderId");
@@ -45,14 +55,13 @@ function Chatbot({ onClose }) {
                     type: "text"
                 };
                 setChatHistory([welcomeMessageOutput]);
+                // Focus input after welcome message is shown
+                focusInput();
             }, 500);
         }
 
-        if (inputRef.current) {
-            setTimeout(() => {
-                inputRef.current.focus();
-            }, 100);
-        }
+        // Focus input when chatbot first opens
+        focusInput();
     }, []);
 
     useEffect(() => {
@@ -65,6 +74,7 @@ function Chatbot({ onClose }) {
 
     const sendPayloadToRasa = async (payload, displayText, currentSenderId) => {
         if (!payload || (!payload.trim() && !displayText)) return;
+
         const idToUse = currentSenderId || senderId;
 
         if (displayText) {
@@ -75,10 +85,12 @@ function Chatbot({ onClose }) {
             };
             setChatHistory((prevHistory) => [...prevHistory, userMessageEntry]);
         }
+
         setIsLoading(true);
         if (payload === message) {
             setMessage("");
         }
+
         try {
             const backendUrl = "http://localhost:5000/chat";
             const response = await fetch(backendUrl, {
@@ -86,6 +98,7 @@ function Chatbot({ onClose }) {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ message: payload, sender: idToUse }),
             });
+
             if (!response.ok) {
                 let errorData;
                 try { errorData = await response.json(); }
@@ -98,6 +111,7 @@ function Chatbot({ onClose }) {
                 setChatHistory((prevHistory) => [...prevHistory, ...errorMessages]);
                 return;
             }
+
             const rasaResponseData = await response.json();
             const botMessages = rasaResponseData.map((resItem) => ({
                 text: resItem.text, image: resItem.image, buttons: resItem.buttons, sender: "bot",
@@ -113,13 +127,15 @@ function Chatbot({ onClose }) {
             setChatHistory((prevHistory) => [...prevHistory, networkErrorMessage]);
         } finally {
             setIsLoading(false);
-            setTimeout(() => inputRef.current?.focus(), 0); // Ensure focus happens after state update
+            // Focus input after response is received and loading is complete
+            focusInput();
         }
     };
 
     const handleSubmit = (event) => {
         event.preventDefault();
         if (!message.trim() || !senderId) return;
+
         sendPayloadToRasa(message, message, senderId);
     };
 
@@ -219,7 +235,7 @@ function Chatbot({ onClose }) {
                 <div ref={chatMessagesEndRef} />
             </main>
 
-            <footer className="bg-white p-3 border-t border-slate-200 rounded-b-xl shadow- ऊपर">
+            <footer className="bg-white p-3 border-t border-slate-200 rounded-b-xl shadow-sm">
                 <form
                     onSubmit={handleSubmit}
                     className="flex items-center gap-2.5"

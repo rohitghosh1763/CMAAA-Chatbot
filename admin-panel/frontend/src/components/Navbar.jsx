@@ -20,7 +20,7 @@ const Navbar = () => {
                         <div className="flex items-center space-x-2">
                             <Settings className="text-indigo-200" size={24} />
                             <span className="text-white font-bold text-xl cursor-pointer" onClick={() => handleNavigate("intents")}>
-                                CMAAA Chatbot Admin Panel
+                                Chatbot Admin Panel
                             </span>
                         </div>
                     </div>
